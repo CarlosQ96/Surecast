@@ -133,8 +133,8 @@ importers:
   packages/snap:
     dependencies:
       '@metamask/snaps-sdk':
-        specifier: ~10.3.0
-        version: 10.3.0(webextension-polyfill@0.12.0)
+        specifier: ~10.4.0
+        version: 10.4.0(webextension-polyfill@0.12.0)
     devDependencies:
       '@jest/globals':
         specifier: ^29.5.0
@@ -1730,10 +1730,6 @@ packages:
   '@metamask/snaps-sandbox@1.0.0':
     resolution: {integrity: sha512-0I3zHtBqnCIBSIV6D5HtOgWhSA+jiK05oIhusnCG09aJfqYecDk8RBKCVpoeQroCX1AhiA1n5APbaSfdzflnCA==}
     engines: {node: ^18.16 || >=20}
-
-  '@metamask/snaps-sdk@10.3.0':
-    resolution: {integrity: sha512-FstSCNnU2qOo1YFSIIvSHYucx35cFPrgGdQ4T7NtJ7UI2L/eL6y1PZI6UCZRD02Yp7l/jxqyqN2qzp8Y8Yclng==}
-    engines: {node: ^20 || >=22}
 
   '@metamask/snaps-sdk@10.4.0':
     resolution: {integrity: sha512-V+wyZEvURUBBN6gzgCozIQ1MXDU6ihXSjeQxXpdFDNR+SXYs1dyLoivX91qhCh8cbHmTmE2l+n/V2cgrGsMGNA==}
@@ -10079,7 +10075,7 @@ snapshots:
       '@metamask/messenger': 0.3.0
       '@metamask/network-controller': 29.0.0(@babel/runtime@7.28.6)
       '@metamask/snaps-controllers': 17.2.1(@babel/runtime@7.28.6)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(@metamask/transaction-controller@62.14.0(@babel/runtime@7.28.6)(@metamask/address-book-controller@7.0.1(@babel/runtime@7.28.6))(@metamask/eth-block-tracker@15.0.1)(@metamask/snaps-controllers@17.2.1)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(ethers@6.16.0)(webextension-polyfill@0.12.0))(webextension-polyfill@0.12.0)
-      '@metamask/snaps-sdk': 10.3.0(webextension-polyfill@0.12.0)
+      '@metamask/snaps-sdk': 10.4.0(webextension-polyfill@0.12.0)
       '@metamask/snaps-utils': 11.7.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
       '@metamask/superstruct': 3.2.1
       '@metamask/utils': 11.9.0
@@ -10762,7 +10758,7 @@ snapshots:
       '@metamask/rpc-errors': 7.0.3
       '@metamask/snaps-registry': 4.0.0
       '@metamask/snaps-rpc-methods': 14.3.0(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
-      '@metamask/snaps-sdk': 10.3.0(webextension-polyfill@0.12.0)
+      '@metamask/snaps-sdk': 10.4.0(webextension-polyfill@0.12.0)
       '@metamask/snaps-utils': 11.7.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
       '@metamask/superstruct': 3.2.1
       '@metamask/utils': 11.9.0
@@ -10812,7 +10808,7 @@ snapshots:
       '@jest/expect': 29.7.0
       '@jest/globals': 29.7.0
       '@metamask/snaps-controllers': 17.2.1(@babel/runtime@7.28.6)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(@metamask/transaction-controller@62.14.0(@babel/runtime@7.28.6)(@metamask/address-book-controller@7.0.1(@babel/runtime@7.28.6))(@metamask/eth-block-tracker@15.0.1)(@metamask/snaps-controllers@17.2.1)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(ethers@6.16.0)(webextension-polyfill@0.12.0))(webextension-polyfill@0.12.0)
-      '@metamask/snaps-sdk': 10.3.0(webextension-polyfill@0.12.0)
+      '@metamask/snaps-sdk': 10.4.0(webextension-polyfill@0.12.0)
       '@metamask/snaps-simulation': 3.8.0(@babel/runtime@7.28.6)(@metamask/transaction-controller@62.14.0(@babel/runtime@7.28.6)(@metamask/address-book-controller@7.0.1(@babel/runtime@7.28.6))(@metamask/eth-block-tracker@15.0.1)(@metamask/snaps-controllers@17.2.1)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(ethers@6.16.0)(webextension-polyfill@0.12.0))(react@18.3.1)(webextension-polyfill@0.12.0)
       '@metamask/superstruct': 3.2.1
       '@metamask/utils': 11.9.0
@@ -10860,18 +10856,6 @@ snapshots:
 
   '@metamask/snaps-sandbox@1.0.0': {}
 
-  '@metamask/snaps-sdk@10.3.0(webextension-polyfill@0.12.0)':
-    dependencies:
-      '@metamask/key-tree': 10.1.1
-      '@metamask/providers': 22.1.1(webextension-polyfill@0.12.0)
-      '@metamask/rpc-errors': 7.0.3
-      '@metamask/superstruct': 3.2.1
-      '@metamask/utils': 11.9.0
-      luxon: 3.7.2
-    transitivePeerDependencies:
-      - supports-color
-      - webextension-polyfill
-
   '@metamask/snaps-sdk@10.4.0(webextension-polyfill@0.12.0)':
     dependencies:
       '@metamask/key-tree': 10.1.1
@@ -10907,7 +10891,7 @@ snapshots:
       '@metamask/snaps-controllers': 17.2.1(@babel/runtime@7.28.6)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(@metamask/transaction-controller@62.14.0(@babel/runtime@7.28.6)(@metamask/address-book-controller@7.0.1(@babel/runtime@7.28.6))(@metamask/eth-block-tracker@15.0.1)(@metamask/snaps-controllers@17.2.1)(@metamask/snaps-execution-environments@10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0))(ethers@6.16.0)(webextension-polyfill@0.12.0))(webextension-polyfill@0.12.0)
       '@metamask/snaps-execution-environments': 10.4.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
       '@metamask/snaps-rpc-methods': 14.3.0(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
-      '@metamask/snaps-sdk': 10.3.0(webextension-polyfill@0.12.0)
+      '@metamask/snaps-sdk': 10.4.0(webextension-polyfill@0.12.0)
       '@metamask/snaps-utils': 11.7.1(@babel/runtime@7.28.6)(webextension-polyfill@0.12.0)
       '@metamask/superstruct': 3.2.1
       '@metamask/utils': 11.9.0
@@ -10940,7 +10924,7 @@ snapshots:
       '@metamask/rpc-errors': 7.0.3
       '@metamask/slip44': 4.4.0
       '@metamask/snaps-registry': 4.0.0
-      '@metamask/snaps-sdk': 10.3.0(webextension-polyfill@0.12.0)
+      '@metamask/snaps-sdk': 10.4.0(webextension-polyfill@0.12.0)
       '@metamask/superstruct': 3.2.1
       '@metamask/utils': 11.9.0
       '@scure/base': 1.2.6
@@ -14016,7 +14000,7 @@ snapshots:
       confusing-browser-globals: 1.0.11
       eslint: 7.32.0
       eslint-plugin-flowtype: 5.10.0(eslint@9.39.2)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@9.39.2)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.2)
       eslint-plugin-react: 7.37.5(eslint@9.39.2)
       eslint-plugin-react-hooks: 4.6.2(eslint@9.39.2)
@@ -14055,7 +14039,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.12.1(@typescript-eslint/parser@5.62.0(eslint@9.39.2)(typescript@5.7.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2):
+  eslint-module-utils@2.12.1(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
@@ -14109,7 +14093,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@5.62.0(eslint@9.39.2)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -14120,7 +14104,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.2
       eslint-import-resolver-node: 0.3.9
-      eslint-module-utils: 2.12.1(@typescript-eslint/parser@5.62.0(eslint@9.39.2)(typescript@5.7.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
+      eslint-module-utils: 2.12.1(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
       hasown: 2.0.2
       is-core-module: 2.16.1
       is-glob: 4.0.3
@@ -15195,7 +15179,7 @@ snapshots:
       eslint: 7.32.0
       eslint-config-react-app: 6.0.0(@typescript-eslint/eslint-plugin@5.62.0(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint@7.32.0)(typescript@5.7.3))(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(babel-eslint@10.1.0(eslint@9.39.2))(eslint-plugin-flowtype@5.10.0(eslint@7.32.0))(eslint-plugin-import@2.32.0(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@7.32.0))(eslint-plugin-jest@28.14.0(@typescript-eslint/eslint-plugin@8.54.0(@typescript-eslint/parser@8.54.0(eslint@9.39.2)(typescript@5.7.3))(eslint@9.39.2)(typescript@5.7.3))(eslint@9.39.2)(jest@29.7.0(@types/node@25.2.0)(babel-plugin-macros@3.1.0))(typescript@5.7.3))(eslint-plugin-jsx-a11y@6.10.2(eslint@7.32.0))(eslint-plugin-react-hooks@4.6.2(eslint@7.32.0))(eslint-plugin-react@7.37.5(eslint@7.32.0))(eslint@7.32.0)(typescript@5.7.3)
       eslint-plugin-flowtype: 5.10.0(eslint@9.39.2)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@9.39.2)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@7.32.0)(typescript@5.7.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.2)
       eslint-plugin-react: 7.37.5(eslint@9.39.2)
       eslint-plugin-react-hooks: 4.6.2(eslint@9.39.2)
