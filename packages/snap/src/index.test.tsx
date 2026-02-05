@@ -32,7 +32,7 @@ describe('onRpcRequest', () => {
     expect(response).toRespondWith(null);
   });
 
-  it('sets user address', async () => {
+  it('sets user address and returns success', async () => {
     const { request } = await installSnap();
 
     const setResponse = await request({
@@ -40,7 +40,9 @@ describe('onRpcRequest', () => {
       params: { address: '0x1234567890abcdef1234567890abcdef12345678' },
     });
 
-    expect(setResponse).toRespondWith(null);
+    expect(setResponse).toRespondWith(
+      expect.objectContaining({ success: true }),
+    );
 
     const stateResponse = await request({
       method: 'getState',
@@ -51,6 +53,26 @@ describe('onRpcRequest', () => {
         userAddress: '0x1234567890abcdef1234567890abcdef12345678',
       }),
     );
+  });
+
+  it('returns prepared transaction (null by default)', async () => {
+    const { request } = await installSnap();
+
+    const response = await request({
+      method: 'getPreparedTransaction',
+    });
+
+    expect(response).toRespondWith(null);
+  });
+
+  it('clears prepared transaction', async () => {
+    const { request } = await installSnap();
+
+    const response = await request({
+      method: 'clearPreparedTransaction',
+    });
+
+    expect(response).toRespondWith({ success: true });
   });
 
   it('throws on unknown method', async () => {
