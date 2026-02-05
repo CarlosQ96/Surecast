@@ -26,3 +26,14 @@ describe('onRpcRequest', () => {
     });
   });
 });
+
+describe('onHomePage', () => {
+  it('renders the home page', async () => {
+    const { onHomePage } = await installSnap();
+
+    const response = await onHomePage();
+
+    const screen = response.getInterface();
+    expect(screen).toBeDefined();
+  });
+});
