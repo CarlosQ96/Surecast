@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import {
@@ -63,25 +64,6 @@ const CardContainer = styled.div`
   margin-top: 1.5rem;
 `;
 
-const Notice = styled.div`
-  background-color: ${({ theme }) => theme.colors.background?.alternative};
-  border: 1px solid ${({ theme }) => theme.colors.border?.default};
-  color: ${({ theme }) => theme.colors.text?.alternative};
-  border-radius: ${({ theme }) => theme.radii.default};
-  padding: 2.4rem;
-  margin-top: 2.4rem;
-  max-width: 60rem;
-  width: 100%;
-
-  & > * {
-    margin: 0;
-  }
-  ${({ theme }) => theme.mediaQueries.small} {
-    margin-top: 1.2rem;
-    padding: 1.6rem;
-  }
-`;
-
 const ErrorMessage = styled.div`
   background-color: ${({ theme }) => theme.colors.error?.muted};
   border: 1px solid ${({ theme }) => theme.colors.error?.default};
@@ -100,28 +82,63 @@ const ErrorMessage = styled.div`
   }
 `;
 
+type WorkflowInfo = {
+  name: string;
+  stepCount: number;
+} | null;
+
 const Index = () => {
-  const { error } = useMetaMaskContext();
+  const { provider, error } = useMetaMaskContext();
   const { isFlask, snapsDetected, installedSnap } = useMetaMask();
   const requestSnap = useRequestSnap();
   const invokeSnap = useInvokeSnap();
+  const [workflowInfo, setWorkflowInfo] = useState<WorkflowInfo>(null);
 
   const isMetaMaskReady = isLocalSnap(defaultSnapOrigin)
     ? isFlask
     : snapsDetected;
 
-  const handleSendHelloClick = async () => {
-    await invokeSnap({ method: 'hello' });
+  const syncWithSnap = useCallback(async () => {
+    if (!installedSnap) return;
+
+    const accounts = (await provider?.request({
+      method: 'eth_requestAccounts',
+    })) as string[] | null;
+
+    if (accounts?.[0]) {
+      await invokeSnap({
+        method: 'setUserAddress',
+        params: { address: accounts[0] },
+      });
+    }
+
+    const workflow = (await invokeSnap({
+      method: 'getCurrentWorkflow',
+    })) as { name: string; steps: unknown[] } | null;
+
+    if (workflow) {
+      setWorkflowInfo({
+        name: workflow.name,
+        stepCount: workflow.steps?.length ?? 0,
+      });
+    }
+  }, [installedSnap, invokeSnap, provider]);
+
+  useEffect(() => {
+    syncWithSnap();
+  }, [syncWithSnap]);
+
+  const handlePingClick = async () => {
+    const result = await invokeSnap({ method: 'ping' });
+    console.log('Snap responded:', result);
   };
 
   return (
     <Container>
       <Heading>
-        Welcome to <Span>template-snap</Span>
+        Welcome to <Span>Surecast</Span>
       </Heading>
-      <Subtitle>
-        Get started by editing <code>src/index.tsx</code>
-      </Subtitle>
+      <Subtitle>DeFi workflow composer for MetaMask</Subtitle>
       <CardContainer>
         {error && (
           <ErrorMessage>
@@ -131,9 +148,9 @@ const Index = () => {
         {!isMetaMaskReady && (
           <Card
             content={{
-              title: 'Install',
+              title: 'Install MetaMask Flask',
               description:
-                'Snaps is pre-release software only available in MetaMask Flask, a canary distribution for developers with access to upcoming features.',
+                'Snaps is pre-release software only available in MetaMask Flask, a canary distribution for developers.',
               button: <InstallFlaskButton />,
             }}
             fullWidth
@@ -143,8 +160,7 @@ const Index = () => {
           <Card
             content={{
               title: 'Connect',
-              description:
-                'Get started by connecting to and installing the example snap.',
+              description: 'Connect to and install the Surecast snap.',
               button: (
                 <ConnectButton
                   onClick={requestSnap}
@@ -160,7 +176,7 @@ const Index = () => {
             content={{
               title: 'Reconnect',
               description:
-                'While connected to a local running snap this button will always be displayed in order to update the snap if a change is made.',
+                'Update the snap after making changes during development.',
               button: (
                 <ReconnectButton
                   onClick={requestSnap}
@@ -171,14 +187,22 @@ const Index = () => {
             disabled={!installedSnap}
           />
         )}
+        {installedSnap && workflowInfo && (
+          <Card
+            content={{
+              title: 'Current Workflow',
+              description: `${workflowInfo.name} — ${workflowInfo.stepCount} step${workflowInfo.stepCount === 1 ? '' : 's'}. Open the Surecast home in MetaMask to edit.`,
+            }}
+            fullWidth
+          />
+        )}
         <Card
           content={{
-            title: 'Send Hello message',
-            description:
-              'Display a custom message within a confirmation screen in MetaMask.',
+            title: 'Ping Snap',
+            description: 'Test the connection to the Surecast snap.',
             button: (
               <SendHelloButton
-                onClick={handleSendHelloClick}
+                onClick={handlePingClick}
                 disabled={!installedSnap}
               />
             ),
@@ -190,14 +214,6 @@ const Index = () => {
             !shouldDisplayReconnectButton(installedSnap)
           }
         />
-        <Notice>
-          <p>
-            Please note that the <b>snap.manifest.json</b> and{' '}
-            <b>package.json</b> must be located in the server root directory and
-            the bundle must be hosted at the location specified by the location
-            field.
-          </p>
-        </Notice>
       </CardContainer>
     </Container>
   );

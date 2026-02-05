@@ -120,6 +120,25 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
     case 'getState':
       return getState();
 
+    case 'getWorkflows': {
+      const state = await getState();
+      return state.workflows;
+    }
+
+    case 'getCurrentWorkflow': {
+      const state = await getState();
+      return state.currentWorkflow;
+    }
+
+    case 'setUserAddress': {
+      const params = request.params as { address: string } | undefined;
+      if (!params?.address) {
+        throw new Error('Missing address parameter.');
+      }
+      await setState({ userAddress: params.address });
+      return null;
+    }
+
     default:
       throw new Error('Method not found.');
   }
