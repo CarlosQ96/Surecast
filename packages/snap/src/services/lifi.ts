@@ -32,6 +32,8 @@ export type QuoteResult = {
   toAmountMin: string;
   gasUsd: string;
   estimatedSeconds: number;
+  toDecimals: number;
+  fromDecimals: number;
 };
 
 export async function getSwapQuote(
@@ -87,6 +89,8 @@ export async function getSwapQuote(
     toAmountMin: data.estimate.toAmountMin,
     gasUsd: totalGasUsd.toFixed(2),
     estimatedSeconds: data.estimate.executionDuration,
+    toDecimals: data.action.toToken.decimals,
+    fromDecimals: data.action.fromToken.decimals,
   };
 }
 

@@ -41,6 +41,34 @@ export type PreparedTransaction = {
   gasLimit?: string;
   type?: string;
   description?: string;
+  stepId?: string;
+};
+
+export type StepExecutionStatus =
+  | 'pending'
+  | 'quoting'
+  | 'ready'
+  | 'switching-chain'
+  | 'confirming'
+  | 'success'
+  | 'error';
+
+export type StepExecution = {
+  stepId: string;
+  status: StepExecutionStatus;
+  txHash: string | null;
+  chainId: number | null;
+  error: string | null;
+  quotedOutput: string | null;
+  quotedOutputDecimals: number | null;
+};
+
+export type WorkflowExecution = {
+  workflowId: string;
+  startedAt: number;
+  currentStepIndex: number;
+  steps: StepExecution[];
+  status: 'running' | 'paused' | 'completed' | 'failed';
 };
 
 export type SnapState = {
@@ -54,4 +82,5 @@ export type SnapState = {
     slippage: number;
     defaultChain: number;
   };
+  execution: WorkflowExecution | null;
 };

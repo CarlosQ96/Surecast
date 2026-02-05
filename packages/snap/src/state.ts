@@ -13,6 +13,7 @@ const DEFAULT_STATE: SnapState = {
     slippage: 0.5,
     defaultChain: 1,
   },
+  execution: null,
 };
 
 export async function getState(): Promise<SnapState> {

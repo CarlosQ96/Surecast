@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import {
   ConnectButton,
@@ -21,7 +21,16 @@ import { isLocalSnap, shouldDisplayReconnectButton } from '../utils';
 
 type ExecutorStatus =
   | 'idle'
-  | 'fetching'
+  | 'loading-workflow'
+  | 'executing'
+  | 'paused'
+  | 'success'
+  | 'error';
+
+type StepExecutionStatus =
+  | 'pending'
+  | 'quoting'
+  | 'ready'
   | 'switching-chain'
   | 'confirming'
   | 'success'
@@ -33,6 +42,45 @@ interface PreparedTransaction {
   data: string;
   chainId: number;
   description?: string;
+  stepId?: string;
+}
+
+interface StepExecution {
+  stepId: string;
+  status: StepExecutionStatus;
+  txHash: string | null;
+  chainId: number | null;
+  error: string | null;
+  quotedOutput: string | null;
+  quotedOutputDecimals: number | null;
+}
+
+interface WorkflowExecution {
+  workflowId: string;
+  startedAt: number;
+  currentStepIndex: number;
+  steps: StepExecution[];
+  status: 'running' | 'paused' | 'completed' | 'failed';
+}
+
+interface WorkflowStep {
+  id: string;
+  type: string;
+  config: {
+    protocol?: string;
+    fromToken?: string;
+    toToken?: string;
+    amount?: string;
+    useAllFromPrevious?: boolean;
+    fromChain?: number;
+    toChain?: number;
+  };
+}
+
+interface FullWorkflow {
+  id: string;
+  name: string;
+  steps: WorkflowStep[];
 }
 
 // ============================================================
@@ -45,6 +93,14 @@ const BLOCK_EXPLORERS: Record<number, string> = {
   10: 'https://optimistic.etherscan.io',
   137: 'https://polygonscan.com',
   8453: 'https://basescan.org',
+};
+
+const CHAIN_NAMES: Record<number, string> = {
+  1: 'Ethereum',
+  42161: 'Arbitrum',
+  10: 'Optimism',
+  137: 'Polygon',
+  8453: 'Base',
 };
 
 const CHAIN_CONFIGS: Record<
@@ -150,13 +206,6 @@ const statusMessageStyle: CSSProperties = {
   margin: '0.5rem 0',
 };
 
-const txHashLinkStyle: CSSProperties = {
-  color: '#007bff',
-  wordBreak: 'break-all',
-  fontFamily: 'monospace',
-  fontSize: '0.9rem',
-};
-
 const executeButtonStyle: CSSProperties = {
   display: 'inline-block',
   marginTop: '1rem',
@@ -209,6 +258,87 @@ function getBlockExplorerUrl(chainId: number | null, hash: string): string {
   return `${baseUrl}/tx/${hash}`;
 }
 
+const STATUS_ICONS: Record<StepExecutionStatus, string> = {
+  pending: '\u25CB',
+  quoting: '\u25D4',
+  ready: '\u25D4',
+  'switching-chain': '\u25D4',
+  confirming: '\u25D4',
+  success: '\u2713',
+  error: '\u2717',
+};
+
+const STATUS_COLORS: Record<StepExecutionStatus, string> = {
+  pending: '#e9ecef',
+  quoting: '#fff3cd',
+  ready: '#fff3cd',
+  'switching-chain': '#cce5ff',
+  confirming: '#cce5ff',
+  success: '#d4edda',
+  error: '#f8d7da',
+};
+
+function StepProgressBar({
+  execution,
+  workflow,
+}: {
+  execution: WorkflowExecution;
+  workflow: FullWorkflow;
+}) {
+  return (
+    <div style={{ width: '100%', marginTop: '1rem', textAlign: 'left' }}>
+      {execution.steps.map((stepExec, i) => {
+        const step = workflow.steps[i];
+        if (!step) return null;
+
+        const fromChain = CHAIN_NAMES[step.config.fromChain ?? 0] ?? '';
+        const toChain = CHAIN_NAMES[step.config.toChain ?? 0] ?? '';
+        const isCrossChain = step.config.fromChain !== step.config.toChain;
+        const amountLabel = step.config.useAllFromPrevious
+          ? 'chained'
+          : step.config.amount ?? '?';
+
+        return (
+          <div
+            key={stepExec.stepId}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0.75rem 1rem',
+              margin: '0.5rem 0',
+              backgroundColor: STATUS_COLORS[stepExec.status],
+              borderRadius: '6px',
+              fontSize: '0.95rem',
+            }}
+          >
+            <span style={{ marginRight: '0.75rem', fontSize: '1.2rem' }}>
+              {STATUS_ICONS[stepExec.status]}
+            </span>
+            <span style={{ flex: 1 }}>
+              Step {i + 1}: {amountLabel} {step.config.fromToken}
+              {isCrossChain ? ` on ${fromChain}` : ''} → {step.config.toToken}
+              {isCrossChain ? ` on ${toChain}` : ''}
+            </span>
+            <span style={{ fontSize: '0.8rem', color: '#666', marginLeft: '0.5rem' }}>
+              {stepExec.status}
+            </span>
+            {stepExec.txHash && (
+              <a
+                href={getBlockExplorerUrl(stepExec.chainId, stepExec.txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#007bff' }}
+              >
+                View tx
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -228,9 +358,11 @@ const Index = () => {
   // Executor state
   const [execStatus, setExecStatus] = useState<ExecutorStatus>('idle');
   const [execMessage, setExecMessage] = useState('');
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [txChainId, setTxChainId] = useState<number | null>(null);
-  const [txDescription, setTxDescription] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<FullWorkflow | null>(null);
+  const [execution, setExecution] = useState<WorkflowExecution | null>(null);
+
+  // Ref to allow cancellation of in-progress execution
+  const cancelledRef = useRef(false);
 
   const isMetaMaskReady = isLocalSnap(defaultSnapOrigin)
     ? isFlask
@@ -250,14 +382,14 @@ const Index = () => {
       });
     }
 
-    const workflow = (await invokeSnap({
+    const wf = (await invokeSnap({
       method: 'getCurrentWorkflow',
     })) as { name: string; steps: unknown[] } | null;
 
-    if (workflow) {
+    if (wf) {
       setWorkflowInfo({
-        name: workflow.name,
-        stepCount: workflow.steps?.length ?? 0,
+        name: wf.name,
+        stepCount: wf.steps?.length ?? 0,
       });
     }
   }, [installedSnap, invokeSnap, provider]);
@@ -267,14 +399,219 @@ const Index = () => {
   }, [syncWithSnap]);
 
   // ============================================================
-  // EXECUTOR: Fetch prepared tx from snap and send it
+  // CHAIN SWITCHING HELPER
   // ============================================================
 
-  const executeTransaction = useCallback(async () => {
+  const switchChain = useCallback(
+    async (chainId: number) => {
+      if (!provider) return;
+      const chainIdHex = `0x${chainId.toString(16)}`;
+      try {
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainIdHex }],
+        });
+      } catch (switchError: unknown) {
+        if ((switchError as { code?: number }).code === 4902) {
+          const config = CHAIN_CONFIGS[chainId];
+          if (config) {
+            await provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [{ chainId: chainIdHex, ...config }],
+            });
+          } else {
+            throw new Error(
+              `Unknown chain ID: ${chainId}. Please add it to MetaMask manually.`,
+            );
+          }
+        } else {
+          throw switchError;
+        }
+      }
+    },
+    [provider],
+  );
+
+  // ============================================================
+  // STEP EXECUTION LOOP (reusable for initial run + retry)
+  // ============================================================
+
+  const runSteps = useCallback(
+    async (
+      wf: FullWorkflow,
+      exec: WorkflowExecution,
+      startFrom: number,
+      userAccount: string,
+    ) => {
+      if (!provider) return;
+
+      let currentExec = exec;
+
+      for (let i = startFrom; i < wf.steps.length; i++) {
+        if (cancelledRef.current) return;
+
+        const step = wf.steps[i];
+        if (!step) continue;
+
+        const stepLabel = `Step ${i + 1}/${wf.steps.length}`;
+        const isCrossChain = step.config.fromChain !== step.config.toChain;
+        const fromChain = CHAIN_NAMES[step.config.fromChain ?? 0] ?? '';
+        const toChain = CHAIN_NAMES[step.config.toChain ?? 0] ?? '';
+        const tokenDesc = `${step.config.fromToken}${isCrossChain ? ` on ${fromChain}` : ''} → ${step.config.toToken}${isCrossChain ? ` on ${toChain}` : ''}`;
+
+        // 1. Quote
+        setExecMessage(`${stepLabel}: Fetching quote for ${tokenDesc}...`);
+        const updatedStepsQuoting = currentExec.steps.map((s, idx) =>
+          idx === i ? { ...s, status: 'quoting' as const } : s,
+        );
+        currentExec = { ...currentExec, currentStepIndex: i, steps: updatedStepsQuoting };
+        setExecution(currentExec);
+
+        await invokeSnap({
+          method: 'updateStepStatus',
+          params: { stepIndex: i, status: 'quoting' },
+        });
+
+        try {
+          await invokeSnap({
+            method: 'prepareStepQuote',
+            params: { stepIndex: i },
+          });
+        } catch (quoteErr) {
+          const msg = quoteErr instanceof Error ? quoteErr.message : String(quoteErr);
+          await invokeSnap({
+            method: 'updateStepStatus',
+            params: { stepIndex: i, status: 'error', error: msg },
+          });
+          const failedSteps = currentExec.steps.map((s, idx) =>
+            idx === i ? { ...s, status: 'error' as const, error: msg } : s,
+          );
+          setExecution({ ...currentExec, status: 'failed', steps: failedSteps });
+          setExecStatus('paused');
+          setExecMessage(`${stepLabel} quote failed: ${msg}`);
+          return;
+        }
+
+        // 2. Get prepared tx
+        const txData = (await invokeSnap({
+          method: 'getPreparedTransaction',
+        })) as PreparedTransaction;
+
+        // 3. Switch chain
+        if (txData.chainId) {
+          setExecMessage(`${stepLabel}: Switching to ${CHAIN_NAMES[txData.chainId] ?? `chain ${txData.chainId}`}...`);
+          const switchSteps = currentExec.steps.map((s, idx) =>
+            idx === i ? { ...s, status: 'switching-chain' as const, chainId: txData.chainId } : s,
+          );
+          currentExec = { ...currentExec, steps: switchSteps };
+          setExecution(currentExec);
+
+          await invokeSnap({
+            method: 'updateStepStatus',
+            params: { stepIndex: i, status: 'switching-chain' },
+          });
+
+          try {
+            await switchChain(txData.chainId);
+          } catch (switchErr) {
+            const msg = switchErr instanceof Error ? switchErr.message : String(switchErr);
+            await invokeSnap({
+              method: 'updateStepStatus',
+              params: { stepIndex: i, status: 'error', error: msg },
+            });
+            const failedSteps = currentExec.steps.map((s, idx) =>
+              idx === i ? { ...s, status: 'error' as const, error: msg } : s,
+            );
+            setExecution({ ...currentExec, status: 'failed', steps: failedSteps });
+            setExecStatus('paused');
+            setExecMessage(`${stepLabel} chain switch failed: ${msg}`);
+            return;
+          }
+        }
+
+        // 4. Send transaction
+        setExecMessage(`${stepLabel}: Confirm ${tokenDesc} in MetaMask...`);
+        const confirmSteps = currentExec.steps.map((s, idx) =>
+          idx === i ? { ...s, status: 'confirming' as const } : s,
+        );
+        currentExec = { ...currentExec, steps: confirmSteps };
+        setExecution(currentExec);
+
+        await invokeSnap({
+          method: 'updateStepStatus',
+          params: { stepIndex: i, status: 'confirming' },
+        });
+
+        let hash: string;
+        try {
+          hash = (await provider.request({
+            method: 'eth_sendTransaction',
+            params: [
+              {
+                from: userAccount,
+                to: txData.to,
+                value: txData.value,
+                data: txData.data,
+              },
+            ],
+          })) as string;
+        } catch (txErr) {
+          const msg = txErr instanceof Error ? txErr.message : String(txErr);
+          await invokeSnap({
+            method: 'updateStepStatus',
+            params: { stepIndex: i, status: 'error', error: msg },
+          });
+          const failedSteps = currentExec.steps.map((s, idx) =>
+            idx === i ? { ...s, status: 'error' as const, error: msg } : s,
+          );
+          setExecution({ ...currentExec, status: 'failed', steps: failedSteps });
+          setExecStatus('paused');
+          setExecMessage(`${stepLabel} transaction failed: ${msg}`);
+          return;
+        }
+
+        // 5. Mark success
+        await invokeSnap({
+          method: 'updateStepStatus',
+          params: { stepIndex: i, status: 'success', txHash: hash },
+        });
+        await invokeSnap({ method: 'clearPreparedTransaction' });
+
+        const successSteps = currentExec.steps.map((s, idx) =>
+          idx === i
+            ? { ...s, status: 'success' as const, txHash: hash, chainId: txData.chainId }
+            : s,
+        );
+        currentExec = {
+          ...currentExec,
+          currentStepIndex: i + 1,
+          steps: successSteps,
+        };
+        setExecution(currentExec);
+      }
+
+      // All steps done
+      setExecution((prev) =>
+        prev ? { ...prev, status: 'completed' } : null,
+      );
+      setExecStatus('success');
+      setExecMessage(
+        `Workflow "${wf.name}" completed! All ${wf.steps.length} steps executed.`,
+      );
+    },
+    [provider, invokeSnap, switchChain],
+  );
+
+  // ============================================================
+  // EXECUTE WORKFLOW
+  // ============================================================
+
+  const executeWorkflow = useCallback(async () => {
     if (!provider) return;
+    cancelledRef.current = false;
 
     try {
-      // Step 1: Get user accounts
+      // 1. Get accounts
       const accounts = (await provider.request({
         method: 'eth_requestAccounts',
       })) as string[];
@@ -285,102 +622,104 @@ const Index = () => {
         return;
       }
 
-      // Step 2: Tell snap the user's address
       await invokeSnap({
         method: 'setUserAddress',
         params: { address: accounts[0] },
       });
 
-      // Step 3: Get prepared transaction from snap
-      setExecStatus('fetching');
-      setExecMessage('Fetching prepared transaction from Surecast...');
+      // 2. Load workflow
+      setExecStatus('loading-workflow');
+      setExecMessage('Loading workflow from Surecast...');
 
-      const txData = (await invokeSnap({
-        method: 'getPreparedTransaction',
-      })) as PreparedTransaction | null;
+      const wf = (await invokeSnap({
+        method: 'getCurrentWorkflow',
+      })) as FullWorkflow | null;
 
-      if (!txData) {
+      if (!wf || wf.steps.length === 0) {
         setExecStatus('error');
         setExecMessage(
-          'No transaction prepared. Open the Surecast snap home in MetaMask and create a swap first.',
+          'No workflow with steps found. Build one in the Surecast snap first.',
         );
         return;
       }
+      setWorkflow(wf);
 
-      console.log('Received prepared tx:', txData);
-      setTxDescription(txData.description || null);
+      // 3. Initialize execution
+      const { execution: exec } = (await invokeSnap({
+        method: 'startExecution',
+      })) as { execution: WorkflowExecution };
 
-      // Step 4: Switch chain if needed
-      if (txData.chainId) {
-        setExecStatus('switching-chain');
-        setExecMessage(
-          `Switching to chain ${txData.chainId}...`,
-        );
+      setExecution(exec);
+      setExecStatus('executing');
 
-        const chainIdHex = `0x${txData.chainId.toString(16)}`;
-        try {
-          await provider.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: chainIdHex }],
-          });
-        } catch (switchError: unknown) {
-          if ((switchError as { code?: number }).code === 4902) {
-            const config = CHAIN_CONFIGS[txData.chainId];
-            if (config) {
-              await provider.request({
-                method: 'wallet_addEthereumChain',
-                params: [{ chainId: chainIdHex, ...config }],
-              });
-            } else {
-              throw new Error(
-                `Unknown chain ID: ${txData.chainId}. Please add it to MetaMask manually.`,
-              );
-            }
-          } else {
-            throw switchError;
-          }
-        }
-      }
-
-      // Step 5: Send transaction - NO gasLimit, let MetaMask estimate
-      setExecStatus('confirming');
-      setExecMessage('Please confirm the transaction in MetaMask...');
-
-      const hash = (await provider.request({
-        method: 'eth_sendTransaction',
-        params: [
-          {
-            from: accounts[0],
-            to: txData.to,
-            value: txData.value,
-            data: txData.data,
-          },
-        ],
-      })) as string;
-
-      // Step 6: Clear prepared transaction from snap
-      await invokeSnap({ method: 'clearPreparedTransaction' });
-
-      setExecStatus('success');
-      setTxHash(hash);
-      setTxChainId(txData.chainId || 1);
-      setExecMessage('Transaction submitted successfully!');
+      // 4. Run all steps
+      await runSteps(wf, exec, 0, accounts[0]);
     } catch (err: unknown) {
       setExecStatus('error');
       const errorMessage =
         err instanceof Error ? err.message : 'An error occurred';
       setExecMessage(errorMessage);
-      console.error('Executor error:', err);
+      console.error('Workflow execution error:', err);
     }
-  }, [provider, invokeSnap]);
+  }, [provider, invokeSnap, runSteps]);
 
-  const resetExecutor = () => {
+  // ============================================================
+  // RETRY FROM FAILED STEP
+  // ============================================================
+
+  const retryFromStep = useCallback(async () => {
+    if (!provider || !workflow || !execution) return;
+    cancelledRef.current = false;
+
+    const failedIdx = execution.steps.findIndex(
+      (s) => s.status !== 'success',
+    );
+    if (failedIdx === -1) return;
+
+    try {
+      const accounts = (await provider.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
+      if (!accounts?.[0]) return;
+
+      // Reset the failed step
+      await invokeSnap({
+        method: 'updateStepStatus',
+        params: { stepIndex: failedIdx, status: 'pending' },
+      });
+
+      const resetSteps = execution.steps.map((s, idx) =>
+        idx >= failedIdx ? { ...s, status: 'pending' as const, error: null, txHash: null } : s,
+      );
+      const resetExec: WorkflowExecution = {
+        ...execution,
+        status: 'running',
+        steps: resetSteps,
+      };
+      setExecution(resetExec);
+      setExecStatus('executing');
+
+      await runSteps(workflow, resetExec, failedIdx, accounts[0]);
+    } catch (err: unknown) {
+      setExecStatus('error');
+      const errorMessage =
+        err instanceof Error ? err.message : 'An error occurred';
+      setExecMessage(errorMessage);
+    }
+  }, [provider, invokeSnap, workflow, execution, runSteps]);
+
+  // ============================================================
+  // RESET
+  // ============================================================
+
+  const resetExecutor = useCallback(() => {
+    cancelledRef.current = true;
     setExecStatus('idle');
     setExecMessage('');
-    setTxHash(null);
-    setTxChainId(null);
-    setTxDescription(null);
-  };
+    setWorkflow(null);
+    setExecution(null);
+    syncWithSnap();
+  }, [syncWithSnap]);
 
   // ============================================================
   // RENDER
@@ -455,52 +794,75 @@ const Index = () => {
       {installedSnap && (
         <div style={getExecutorBoxStyle(execStatus)}>
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          <h3 style={{ margin: '0 0 0.5rem', color: '#212529' }}>Transaction Executor</h3>
+          <h3 style={{ margin: '0 0 0.5rem', color: '#212529' }}>
+            Workflow Executor
+          </h3>
 
           {execStatus === 'idle' && (
             <>
               <p style={statusMessageStyle}>
-                Prepare a swap in the Surecast snap, then execute it here.
+                Build a workflow in the Surecast snap, then execute all steps
+                here.
               </p>
-              <button style={executeButtonStyle} onClick={executeTransaction}>
-                Execute Prepared Transaction
+              {workflowInfo && (
+                <p style={txDescriptionStyle}>
+                  Ready: &quot;{workflowInfo.name}&quot; with{' '}
+                  {workflowInfo.stepCount} step
+                  {workflowInfo.stepCount === 1 ? '' : 's'}
+                </p>
+              )}
+              <button style={executeButtonStyle} onClick={executeWorkflow}>
+                Execute Workflow
               </button>
             </>
           )}
 
-          {(execStatus === 'fetching' ||
-            execStatus === 'switching-chain' ||
-            execStatus === 'confirming') && (
+          {execStatus === 'loading-workflow' && (
             <>
               <div style={spinnerStyle} />
               <p style={statusMessageStyle}>{execMessage}</p>
             </>
           )}
 
+          {execStatus === 'executing' && (
+            <>
+              <div style={spinnerStyle} />
+              <p style={statusMessageStyle}>{execMessage}</p>
+              {execution && workflow && (
+                <StepProgressBar execution={execution} workflow={workflow} />
+              )}
+            </>
+          )}
+
+          {execStatus === 'paused' && (
+            <>
+              <p style={statusMessageStyle}>{execMessage}</p>
+              {execution && workflow && (
+                <StepProgressBar execution={execution} workflow={workflow} />
+              )}
+              <button style={executeButtonStyle} onClick={retryFromStep}>
+                Retry from failed step
+              </button>
+              <button
+                style={{ ...retryButtonStyle, marginLeft: '0.5rem' }}
+                onClick={resetExecutor}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
           {execStatus === 'success' && (
             <>
               <p style={statusMessageStyle}>{execMessage}</p>
-              {txDescription && (
-                <p style={txDescriptionStyle}>{txDescription}</p>
+              {execution && workflow && (
+                <StepProgressBar execution={execution} workflow={workflow} />
               )}
-              {txHash && (
-                <>
-                  <p>
-                    <strong>Transaction Hash:</strong>
-                  </p>
-                  <a
-                    style={txHashLinkStyle}
-                    href={getBlockExplorerUrl(txChainId, txHash)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {txHash}
-                  </a>
-                </>
-              )}
-              <br />
-              <button style={{ ...executeButtonStyle, marginTop: '1rem' }} onClick={resetExecutor}>
-                Execute Another
+              <button
+                style={{ ...executeButtonStyle, marginTop: '1rem' }}
+                onClick={resetExecutor}
+              >
+                Execute Another Workflow
               </button>
             </>
           )}
@@ -508,7 +870,9 @@ const Index = () => {
           {execStatus === 'error' && (
             <>
               <p style={statusMessageStyle}>{execMessage}</p>
-              <button style={retryButtonStyle} onClick={resetExecutor}>Retry</button>
+              <button style={retryButtonStyle} onClick={resetExecutor}>
+                Reset
+              </button>
             </>
           )}
         </div>
