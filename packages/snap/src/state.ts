@@ -20,7 +20,10 @@ export async function getState(): Promise<SnapState> {
     method: 'snap_manageState',
     params: { operation: 'get' },
   });
-  return (stored as SnapState) ?? DEFAULT_STATE;
+  if (!stored) {
+    return DEFAULT_STATE;
+  }
+  return { ...DEFAULT_STATE, ...(stored as Partial<SnapState>) };
 }
 
 export async function setState(

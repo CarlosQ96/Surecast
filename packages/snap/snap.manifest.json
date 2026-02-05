@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "description": "Surecast - DeFi insurance snap for MetaMask",
+  "description": "Surecast - DeFi Lifi Composer with ENS text records persistence snap for MetaMask",
   "proposedName": "Surecast",
   "source": {
-    "shasum": "F2bDt9ff1fEeQ/QEEIdeyaBU68hCxmgllL0dW6HEPyo=",
+    "shasum": "CeXXEuY1P84w8S+ZP8HaBdMJ+J79WLBiPXFosYzJ4Tg=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",
@@ -19,6 +19,7 @@
       "snaps": false
     },
     "endowment:network-access": {},
+    "endowment:lifecycle-hooks": {},
     "snap_dialog": {},
     "snap_manageState": {}
   },
