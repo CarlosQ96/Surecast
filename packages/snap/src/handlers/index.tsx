@@ -4,6 +4,10 @@ import {
   Text,
   Button,
   Divider,
+  Section,
+  Row,
+  Icon,
+  Banner,
   Spinner,
 } from '@metamask/snaps-sdk/jsx';
 
@@ -36,10 +40,17 @@ export async function handleSwapSubmit(
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
     await updateUI(id, (
       <Box>
-        <Heading>Invalid Amount</Heading>
-        <Text>Please enter a valid positive number.</Text>
-        <Button name="step-swap">Try Again</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="Invalid Amount" severity="warning">
+          <Text>Please enter a valid positive number.</Text>
+        </Banner>
+        <Button name="step-swap" variant="primary">
+          <Icon name="arrow-left" size="inherit" />
+          {' Try Again'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -49,10 +60,17 @@ export async function handleSwapSubmit(
   if (fromChain === toChain && fromSymbol === toSymbol) {
     await updateUI(id, (
       <Box>
-        <Heading>Invalid Swap</Heading>
-        <Text>Cannot swap a token to itself on the same chain. Choose a different destination token or chain.</Text>
-        <Button name="step-swap">Try Again</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="Invalid Swap" severity="danger">
+          <Text>Cannot swap a token to itself on the same chain. Choose a different destination token or chain.</Text>
+        </Banner>
+        <Button name="step-swap" variant="primary">
+          <Icon name="arrow-left" size="inherit" />
+          {' Try Again'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -64,10 +82,17 @@ export async function handleSwapSubmit(
   if (!fromTokenInfo) {
     await updateUI(id, (
       <Box>
-        <Heading>Token Not Found</Heading>
-        <Text>{`${fromSymbol} is not available on ${CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
-        <Button name="step-swap">Try Again</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="Token Not Found" severity="danger">
+          <Text>{`${fromSymbol} is not available on ${CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
+        </Banner>
+        <Button name="step-swap" variant="primary">
+          <Icon name="arrow-left" size="inherit" />
+          {' Try Again'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -75,10 +100,17 @@ export async function handleSwapSubmit(
   if (!toTokenInfo) {
     await updateUI(id, (
       <Box>
-        <Heading>Token Not Found</Heading>
-        <Text>{`${toSymbol} is not available on ${CHAIN_NAMES[toChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
-        <Button name="step-swap">Try Again</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="Token Not Found" severity="danger">
+          <Text>{`${toSymbol} is not available on ${CHAIN_NAMES[toChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
+        </Banner>
+        <Button name="step-swap" variant="primary">
+          <Icon name="arrow-left" size="inherit" />
+          {' Try Again'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -115,11 +147,19 @@ export async function handleSwapSubmit(
   const amountLabel = useAll ? 'all from previous step' : `${humanAmount} ${fromSymbol}`;
   await updateUI(id, (
     <Box>
-      <Heading>Step Added</Heading>
-      <Text>{`Swap ${amountLabel} → ${toSymbol}`}</Text>
-      <Divider />
-      <Button name="add-step">Add Another Step</Button>
-      <Button name="back-home">Back to Workflow</Button>
+      <Banner title="Step Added" severity="success">
+        <Text>{`Swap ${amountLabel} → ${toSymbol}`}</Text>
+      </Banner>
+      <Section>
+        <Button name="add-step" variant="primary">
+          <Icon name="add" size="inherit" />
+          {' Add Another Step'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back to Workflow'}
+        </Button>
+      </Section>
     </Box>
   ));
 }
@@ -129,10 +169,17 @@ export async function handleGetQuote(id: string, state: SnapState) {
   if (!workflow || workflow.steps.length === 0) {
     await updateUI(id, (
       <Box>
-        <Heading>No Steps</Heading>
-        <Text>Add at least one step before getting a quote.</Text>
-        <Button name="add-step">Add Step</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="No Steps" severity="warning">
+          <Text>Add at least one step before getting a quote.</Text>
+        </Banner>
+        <Button name="add-step" variant="primary">
+          <Icon name="add" size="inherit" />
+          {' Add Step'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -143,9 +190,13 @@ export async function handleGetQuote(id: string, state: SnapState) {
   if (!firstStep || firstStep.type !== 'swap') {
     await updateUI(id, (
       <Box>
-        <Heading>Not Supported Yet</Heading>
-        <Text>Only swap steps can be quoted right now.</Text>
-        <Button name="back-home">Back</Button>
+        <Banner title="Not Supported Yet" severity="warning">
+          <Text>Only swap steps can be quoted right now.</Text>
+        </Banner>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -164,9 +215,13 @@ export async function handleGetQuote(id: string, state: SnapState) {
   if (!fromTokenInfo) {
     await updateUI(id, (
       <Box>
-        <Heading>Token Error</Heading>
-        <Text>{`Cannot find ${fromSymbol} on chain ${fromChain}.`}</Text>
-        <Button name="back-home">Back</Button>
+        <Banner title="Token Error" severity="danger">
+          <Text>{`Cannot find ${fromSymbol} on chain ${fromChain}.`}</Text>
+        </Banner>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
     return;
@@ -174,9 +229,12 @@ export async function handleGetQuote(id: string, state: SnapState) {
 
   await updateUI(id, (
     <Box>
-      <Heading>Fetching Preview Quote...</Heading>
+      <Box direction="horizontal" alignment="space-between">
+        <Heading>Fetching Quote</Heading>
+        <Icon name="flash" color="primary" />
+      </Box>
       <Spinner />
-      <Text>{`Step 1: ${humanAmount} ${fromSymbol} → ${toSymbol}`}</Text>
+      <Text color="muted">{`Step 1: ${humanAmount} ${fromSymbol} → ${toSymbol}`}</Text>
     </Box>
   ));
 
@@ -209,34 +267,54 @@ export async function handleGetQuote(id: string, state: SnapState) {
 
     await updateUI(id, (
       <Box>
-        <Heading>Quote Preview</Heading>
+        <Box direction="horizontal" alignment="space-between">
+          <Heading>Quote Preview</Heading>
+          <Icon name="flash" color="primary" />
+        </Box>
         <Divider />
-        <Text>{`Step 1: ${humanAmount} ${quote.fromSymbol} → ${quote.toSymbol}`}</Text>
-        <Text>{`Estimated output: ${estOutput} ${quote.toSymbol}`}</Text>
-        <Text>{`Minimum output: ${minOutput} ${quote.toSymbol}`}</Text>
-        <Text>{`Gas cost: ~$${quote.gasUsd}`}</Text>
-        <Text>{`Estimated time: ~${quote.estimatedSeconds}s`}</Text>
-        {isMultiStep && (
-          <Box>
-            <Divider />
-            <Text>{`This workflow has ${workflow.steps.length} steps total.`}</Text>
-            <Text>Fresh quotes will be fetched for each step during execution.</Text>
-          </Box>
-        )}
+        <Section>
+          <Text fontWeight="bold">{`${humanAmount} ${quote.fromSymbol} → ${quote.toSymbol}`}</Text>
+          <Row label="Estimated output">
+            <Text>{`${estOutput} ${quote.toSymbol}`}</Text>
+          </Row>
+          <Row label="Minimum output">
+            <Text>{`${minOutput} ${quote.toSymbol}`}</Text>
+          </Row>
+          <Row label="Gas cost">
+            <Text>{`~$${quote.gasUsd}`}</Text>
+          </Row>
+          <Row label="Estimated time">
+            <Text>{`~${quote.estimatedSeconds}s`}</Text>
+          </Row>
+        </Section>
+        {isMultiStep ? (
+          <Banner title="Multi-step Workflow" severity="info">
+            <Text>{`${workflow.steps.length} steps total. Fresh quotes fetched per step during execution.`}</Text>
+          </Banner>
+        ) : null}
         <Divider />
-        <Text>Open the Surecast executor page to run this workflow.</Text>
-        <Button name="back-home">Back to Home</Button>
+        <Text color="muted" size="sm">Open the Surecast executor page to run this workflow.</Text>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back to Home'}
+        </Button>
       </Box>
     ));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await updateUI(id, (
       <Box>
-        <Heading>Quote Failed</Heading>
-        <Text>{msg}</Text>
-        <Divider />
-        <Button name="get-quote">Retry</Button>
-        <Button name="back-home">Back</Button>
+        <Banner title="Quote Failed" severity="danger">
+          <Text>{msg}</Text>
+        </Banner>
+        <Button name="get-quote" variant="primary">
+          <Icon name="flash" size="inherit" />
+          {' Retry'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
       </Box>
     ));
   }

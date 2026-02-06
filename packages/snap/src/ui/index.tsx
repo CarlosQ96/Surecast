@@ -4,6 +4,10 @@ import {
   Text,
   Button,
   Divider,
+  Section,
+  Card,
+  Icon,
+  Banner,
   Form,
   Field,
   Input,
@@ -21,38 +25,99 @@ export function renderHome(state: SnapState) {
 
   return (
     <Box>
-      <Heading>Surecast</Heading>
-      <Text>DeFi workflow composer</Text>
-      {state.userEns ? <Text>{`ENS: ${state.userEns}`}</Text> : null}
+      <Box direction="horizontal" alignment="space-between">
+        <Heading size="lg">Surecast</Heading>
+        <Icon name="flash" color="primary" />
+      </Box>
+      <Text color="muted">DeFi workflow composer</Text>
+      {state.userEns ? (
+        <Text color="alternative" size="sm">{`ENS: ${state.userEns}`}</Text>
+      ) : null}
+
       <Divider />
+
       {workflow ? (
-        <Box>
-          <Text>{`Workflow: ${workflow.name}`}</Text>
-          {steps.length === 0 && <Text>No steps yet. Add one below.</Text>}
+        <Section>
+          <Box direction="horizontal" alignment="space-between">
+            <Text fontWeight="bold">{workflow.name}</Text>
+            <Text color="muted" size="sm">
+              {`${steps.length} step${steps.length === 1 ? '' : 's'}`}
+            </Text>
+          </Box>
+          {steps.length === 0 ? (
+            <Text color="muted">No steps yet. Add one below.</Text>
+          ) : null}
           {steps.map((s, i) => {
-            const fromChainName = CHAIN_NAMES[s.config.fromChain as keyof typeof CHAIN_NAMES] ?? '?';
-            const toChainName = CHAIN_NAMES[s.config.toChain as keyof typeof CHAIN_NAMES] ?? '?';
-            const amountDisplay = s.config.useAllFromPrevious ? 'all from prev' : (s.config.amount ?? '?');
+            const fromChainName =
+              CHAIN_NAMES[s.config.fromChain as keyof typeof CHAIN_NAMES] ??
+              '?';
+            const toChainName =
+              CHAIN_NAMES[s.config.toChain as keyof typeof CHAIN_NAMES] ?? '?';
+            const amountDisplay = s.config.useAllFromPrevious
+              ? 'all from prev'
+              : (s.config.amount ?? '?');
             const isCrossChain = s.config.fromChain !== s.config.toChain;
+
             return (
               <Box>
-                <Text>{`${i + 1}. ${s.type.toUpperCase()} ${amountDisplay} ${s.config.fromToken ?? '?'} on ${fromChainName} → ${s.config.toToken ?? '?'}${isCrossChain ? ` on ${toChainName}` : ''}`}</Text>
-                <Button name={`delete-step-${s.id}`}>Remove</Button>
+                <Card
+                  title={`Step ${i + 1}: ${s.type.toUpperCase()}`}
+                  description={
+                    isCrossChain
+                      ? `${fromChainName} → ${toChainName}`
+                      : fromChainName
+                  }
+                  value={`${amountDisplay} ${s.config.fromToken ?? '?'} → ${s.config.toToken ?? '?'}`}
+                  extra={s.type}
+                />
+                <Button
+                  name={`delete-step-${s.id}`}
+                  variant="destructive"
+                  size="sm"
+                >
+                  <Icon name="trash" size="inherit" />
+                  {' Remove'}
+                </Button>
               </Box>
             );
           })}
-        </Box>
+        </Section>
       ) : (
-        <Text>No workflow loaded. Start by adding a step.</Text>
+        <Section>
+          <Text color="muted">No workflow loaded. Add a step to begin.</Text>
+        </Section>
       )}
-      <Divider />
-      <Button name="add-step">Add Step</Button>
-      {steps.length > 0 && <Button name="get-quote">Get Quote</Button>}
-      {steps.length > 0 && <Button name="save-workflow">Save Workflow</Button>}
-      {state.userEns && steps.length > 0 ? <Text>Open executor page to save to ENS.</Text> : null}
-      {(state.workflows?.length ?? 0) > 0 && (
-        <Button name="load-workflow">Load Saved</Button>
-      )}
+
+      <Section>
+        <Button name="add-step" variant="primary">
+          <Icon name="add" size="inherit" />
+          {' Add Step'}
+        </Button>
+        {steps.length > 0 ? (
+          <Button name="get-quote">
+            <Icon name="flash" size="inherit" />
+            {' Get Quote'}
+          </Button>
+        ) : null}
+        {steps.length > 0 ? (
+          <Button name="save-workflow">
+            <Icon name="save" size="inherit" />
+            {' Save Workflow'}
+          </Button>
+        ) : null}
+        {(state.workflows?.length ?? 0) > 0 ? (
+          <Button name="load-workflow">
+            <Icon name="download" size="inherit" />
+            {' Load Saved'}
+          </Button>
+        ) : null}
+      </Section>
+
+      {state.userEns && steps.length > 0 ? (
+        <Banner title="ENS" severity="info">
+          <Text>Open executor page to save to ENS.</Text>
+        </Banner>
+      ) : null}
     </Box>
   );
 }
@@ -64,8 +129,11 @@ export function renderSwapForm(existingStepCount: number) {
 
   return (
     <Box>
-      <Heading>Add Swap Step</Heading>
-      <Text>Configure a token swap</Text>
+      <Box direction="horizontal" alignment="space-between">
+        <Heading>Add Swap Step</Heading>
+        <Icon name="swap-horizontal" color="primary" />
+      </Box>
+      <Text color="muted" size="sm">Configure a token swap or bridge</Text>
       <Divider />
       <Form name="swap-form">
         <Field label="From Chain">
@@ -100,17 +168,29 @@ export function renderSwapForm(existingStepCount: number) {
           <Field label="Use output from previous step?">
             <Dropdown name="useAllFromPrevious" value="No">
               <Option value="No">No - enter amount manually</Option>
-              <Option value="Yes">Yes - use all output from previous step</Option>
+              <Option value="Yes">Yes - use all output</Option>
             </Dropdown>
           </Field>
         )}
-        <Field label={existingStepCount > 0 ? 'Amount (ignored if using previous output)' : 'Amount (e.g. 10)'}>
+        <Field
+          label={
+            existingStepCount > 0
+              ? 'Amount (ignored if using previous output)'
+              : 'Amount (e.g. 10)'
+          }
+        >
           <Input name="amount" placeholder="10" />
         </Field>
-        <Button name="submit-swap">Add to Workflow</Button>
+        <Button name="submit-swap" variant="primary">
+          <Icon name="add" size="inherit" />
+          {' Add to Workflow'}
+        </Button>
       </Form>
       <Divider />
-      <Button name="back-home">Cancel</Button>
+      <Button name="back-home">
+        <Icon name="arrow-left" size="inherit" />
+        {' Cancel'}
+      </Button>
     </Box>
   );
 }

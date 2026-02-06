@@ -139,6 +139,24 @@ const CHAIN_CONFIGS: Record<
   },
 };
 
+const COLORS = {
+  primary: '#3F49E1',
+  primaryHover: '#7C83EB',
+  black: '#000000',
+  white: '#FFFFFF',
+  offWhite: '#F6F3F2',
+  grayLight: '#E4E7E9',
+  grayMid: '#798086',
+  grayDark: '#212529',
+  success: '#28a745',
+  successBg: '#d4edda',
+  error: '#dc3545',
+  errorBg: '#f8d7da',
+  errorText: '#721c24',
+  warningBg: '#fff3cd',
+  infoBg: '#e7edfb',
+};
+
 // ============================================================
 // INLINE STYLES
 // ============================================================
@@ -151,12 +169,14 @@ const containerStyle: CSSProperties = {
   marginTop: '7.6rem',
   marginBottom: '7.6rem',
   padding: '0 2rem',
+  fontFamily: 'Inter, system-ui, sans-serif',
 };
 
 const headingStyle: CSSProperties = {
   marginTop: 0,
   marginBottom: '2.4rem',
   textAlign: 'center',
+  letterSpacing: '-0.5px',
 };
 
 const subtitleStyle: CSSProperties = {
@@ -164,6 +184,7 @@ const subtitleStyle: CSSProperties = {
   fontWeight: 500,
   marginTop: 0,
   marginBottom: 0,
+  color: COLORS.grayMid,
 };
 
 const cardContainerStyle: CSSProperties = {
@@ -178,10 +199,10 @@ const cardContainerStyle: CSSProperties = {
 };
 
 const errorMessageStyle: CSSProperties = {
-  backgroundColor: '#f8d7da',
-  border: '1px solid #dc3545',
-  color: '#721c24',
-  borderRadius: '8px',
+  backgroundColor: COLORS.errorBg,
+  border: `1px solid ${COLORS.error}`,
+  color: COLORS.errorText,
+  borderRadius: '4px',
   padding: '2.4rem',
   marginBottom: '2.4rem',
   marginTop: '2.4rem',
@@ -189,51 +210,62 @@ const errorMessageStyle: CSSProperties = {
   width: '100%',
 };
 
-const getExecutorBoxStyle = (status: ExecutorStatus): CSSProperties => ({
-  backgroundColor:
-    status === 'success' ? '#d4edda' : status === 'error' ? '#f8d7da' : '#f8f9fa',
-  border: `1px solid ${status === 'success' ? '#28a745' : status === 'error' ? '#dc3545' : '#dee2e6'}`,
-  borderRadius: '8px',
+const sectionCardStyle: CSSProperties = {
+  backgroundColor: COLORS.white,
+  border: `1px solid ${COLORS.black}`,
+  borderRadius: '4px',
+  boxShadow: `6px 6px 0px ${COLORS.black}`,
   padding: '2rem',
   marginTop: '2rem',
   maxWidth: '64.8rem',
   width: '100%',
   textAlign: 'center',
-  color: '#212529',
+  color: COLORS.grayDark,
+};
+
+const getSectionCardStatus = (status: ExecutorStatus): CSSProperties => ({
+  ...sectionCardStyle,
+  ...(status === 'success'
+    ? { borderColor: COLORS.success, boxShadow: `6px 6px 0px ${COLORS.success}` }
+    : status === 'error'
+      ? { borderColor: COLORS.error, boxShadow: `6px 6px 0px ${COLORS.error}` }
+      : {}),
 });
 
 const statusMessageStyle: CSSProperties = {
   fontSize: '1.1rem',
   margin: '0.5rem 0',
+  color: COLORS.grayDark,
 };
 
-const executeButtonStyle: CSSProperties = {
+const primaryButtonStyle: CSSProperties = {
   display: 'inline-block',
   marginTop: '1rem',
   padding: '0.75rem 1.5rem',
-  backgroundColor: '#007bff',
-  color: 'white',
+  backgroundColor: COLORS.primary,
+  color: COLORS.white,
   border: 'none',
   borderRadius: '4px',
-  fontWeight: 500,
+  fontWeight: 600,
   fontSize: '1rem',
   cursor: 'pointer',
+  letterSpacing: '-0.1px',
 };
 
 const retryButtonStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '0.5rem 1rem',
   cursor: 'pointer',
-  border: '1px solid #dc3545',
-  background: 'white',
+  border: `1px solid ${COLORS.error}`,
+  background: COLORS.white,
   borderRadius: '4px',
-  color: '#dc3545',
-  fontWeight: 500,
+  color: COLORS.error,
+  fontWeight: 600,
 };
 
 const spinnerStyle: CSSProperties = {
-  border: '4px solid #dee2e6',
-  borderTop: '4px solid #007bff',
+  border: `4px solid ${COLORS.grayLight}`,
+  borderTop: `4px solid ${COLORS.primary}`,
   borderRadius: '50%',
   width: '40px',
   height: '40px',
@@ -243,8 +275,16 @@ const spinnerStyle: CSSProperties = {
 
 const txDescriptionStyle: CSSProperties = {
   fontSize: '0.95rem',
-  color: '#555',
+  color: COLORS.grayMid,
   margin: '0.25rem 0',
+};
+
+const sectionTitleStyle: CSSProperties = {
+  margin: '0 0 0.5rem',
+  color: COLORS.grayDark,
+  fontSize: '1.1rem',
+  fontWeight: 700,
+  letterSpacing: '-0.3px',
 };
 
 // ============================================================
@@ -270,13 +310,13 @@ const STATUS_ICONS: Record<StepExecutionStatus, string> = {
 };
 
 const STATUS_COLORS: Record<StepExecutionStatus, string> = {
-  pending: '#e9ecef',
-  quoting: '#fff3cd',
-  ready: '#fff3cd',
-  'switching-chain': '#cce5ff',
-  confirming: '#cce5ff',
-  success: '#d4edda',
-  error: '#f8d7da',
+  pending: COLORS.offWhite,
+  quoting: COLORS.warningBg,
+  ready: COLORS.warningBg,
+  'switching-chain': COLORS.infoBg,
+  confirming: COLORS.infoBg,
+  success: COLORS.successBg,
+  error: COLORS.errorBg,
 };
 
 function StepProgressBar({
@@ -308,19 +348,20 @@ function StepProgressBar({
               padding: '0.75rem 1rem',
               margin: '0.5rem 0',
               backgroundColor: STATUS_COLORS[stepExec.status],
-              borderRadius: '6px',
+              border: `1px solid ${COLORS.grayLight}`,
+              borderRadius: '4px',
               fontSize: '0.95rem',
             }}
           >
             <span style={{ marginRight: '0.75rem', fontSize: '1.2rem' }}>
               {STATUS_ICONS[stepExec.status]}
             </span>
-            <span style={{ flex: 1 }}>
+            <span style={{ flex: 1, fontWeight: 500 }}>
               Step {i + 1}: {amountLabel} {step.config.fromToken}
               {isCrossChain ? ` on ${fromChain}` : ''} → {step.config.toToken}
               {isCrossChain ? ` on ${toChain}` : ''}
             </span>
-            <span style={{ fontSize: '0.8rem', color: '#666', marginLeft: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', color: COLORS.grayMid, marginLeft: '0.5rem' }}>
               {stepExec.status}
             </span>
             {stepExec.txHash && (
@@ -328,7 +369,7 @@ function StepProgressBar({
                 href={getBlockExplorerUrl(stepExec.chainId, stepExec.txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#007bff' }}
+                style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: COLORS.primary }}
               >
                 View tx
               </a>
@@ -848,8 +889,9 @@ const Index = () => {
 
   return (
     <div style={containerStyle}>
+      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       <h1 style={headingStyle}>
-        Welcome to <span style={{ color: '#8b5cf6' }}>Surecast</span>
+        Welcome to <span style={{ color: COLORS.primary }}>Surecast</span>
       </h1>
       <p style={subtitleStyle}>DeFi workflow composer for MetaMask</p>
       <div style={cardContainerStyle}>
@@ -901,23 +943,28 @@ const Index = () => {
           />
         )}
         {installedSnap && workflowInfo && (
-          <Card
-            content={{
-              title: 'Current Workflow',
-              description: `${workflowInfo.name} — ${workflowInfo.stepCount} step${workflowInfo.stepCount === 1 ? '' : 's'}. Open the Surecast home in MetaMask to edit.`,
-            }}
-            fullWidth
-          />
+          <div style={{
+            ...sectionCardStyle,
+            backgroundColor: COLORS.infoBg,
+            borderColor: COLORS.primary,
+            boxShadow: `6px 6px 0px ${COLORS.primary}`,
+            textAlign: 'left',
+          }}>
+            <h3 style={sectionTitleStyle}>Current Workflow</h3>
+            <p style={{ margin: '0.25rem 0', fontSize: '1rem', fontWeight: 500 }}>
+              {workflowInfo.name}
+            </p>
+            <p style={txDescriptionStyle}>
+              {workflowInfo.stepCount} step{workflowInfo.stepCount === 1 ? '' : 's'} — Open the Surecast home in MetaMask to edit.
+            </p>
+          </div>
         )}
       </div>
 
       {/* Executor Section */}
       {installedSnap && (
-        <div style={getExecutorBoxStyle(execStatus)}>
-          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          <h3 style={{ margin: '0 0 0.5rem', color: '#212529' }}>
-            Workflow Executor
-          </h3>
+        <div style={getSectionCardStatus(execStatus)}>
+          <h3 style={sectionTitleStyle}>Workflow Executor</h3>
 
           {execStatus === 'idle' && (
             <>
@@ -932,7 +979,7 @@ const Index = () => {
                   {workflowInfo.stepCount === 1 ? '' : 's'}
                 </p>
               )}
-              <button style={executeButtonStyle} onClick={executeWorkflow}>
+              <button style={primaryButtonStyle} onClick={executeWorkflow}>
                 Execute Workflow
               </button>
             </>
@@ -961,7 +1008,7 @@ const Index = () => {
               {execution && workflow && (
                 <StepProgressBar execution={execution} workflow={workflow} />
               )}
-              <button style={executeButtonStyle} onClick={retryFromStep}>
+              <button style={primaryButtonStyle} onClick={retryFromStep}>
                 Retry from failed step
               </button>
               <button
@@ -980,7 +1027,7 @@ const Index = () => {
                 <StepProgressBar execution={execution} workflow={workflow} />
               )}
               <button
-                style={{ ...executeButtonStyle, marginTop: '1rem' }}
+                style={{ ...primaryButtonStyle, marginTop: '1rem' }}
                 onClick={resetExecutor}
               >
                 Execute Another Workflow
@@ -1002,12 +1049,15 @@ const Index = () => {
       {/* ENS Section */}
       {installedSnap && (
         <div style={{
-          ...getExecutorBoxStyle(ensTxHash ? 'success' : ensStatus.includes('failed') ? 'error' : 'idle'),
+          ...sectionCardStyle,
           marginTop: '1.5rem',
+          ...(ensTxHash
+            ? { borderColor: COLORS.success, boxShadow: `6px 6px 0px ${COLORS.success}` }
+            : ensStatus.includes('failed')
+              ? { borderColor: COLORS.error, boxShadow: `6px 6px 0px ${COLORS.error}` }
+              : {}),
         }}>
-          <h3 style={{ margin: '0 0 0.5rem', color: '#212529' }}>
-            ENS Workflow Sharing
-          </h3>
+          <h3 style={sectionTitleStyle}>ENS Workflow Sharing</h3>
 
           {ensName ? (
             <p style={txDescriptionStyle}>
@@ -1021,7 +1071,7 @@ const Index = () => {
 
           {ensName && workflowInfo && (
             <button
-              style={executeButtonStyle}
+              style={primaryButtonStyle}
               onClick={saveToEns}
             >
               Save Workflow to ENS
@@ -1038,15 +1088,16 @@ const Index = () => {
                 onChange={(e) => setLoadEnsInput(e.target.value)}
                 style={{
                   padding: '0.5rem 0.75rem',
-                  border: '1px solid #dee2e6',
+                  border: `1px solid ${COLORS.grayLight}`,
                   borderRadius: '4px',
                   fontSize: '0.95rem',
                   width: '200px',
+                  fontFamily: 'inherit',
                 }}
               />
               <button
                 style={{
-                  ...executeButtonStyle,
+                  ...primaryButtonStyle,
                   marginTop: 0,
                   opacity: loadEnsInput ? 1 : 0.5,
                 }}
@@ -1069,7 +1120,7 @@ const Index = () => {
               href={getBlockExplorerUrl(1, ensTxHash)}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: '0.9rem', color: '#007bff' }}
+              style={{ fontSize: '0.9rem', color: COLORS.primary, fontWeight: 500 }}
             >
               View transaction on Etherscan
             </a>

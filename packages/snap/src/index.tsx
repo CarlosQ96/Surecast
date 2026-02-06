@@ -10,6 +10,9 @@ import {
   Text,
   Button,
   Divider,
+  Section,
+  Icon,
+  Banner,
   Form,
   Field,
   Input,
@@ -48,15 +51,35 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
       case 'add-step': {
         await updateUI(id, (
           <Box>
-            <Heading>Add Step</Heading>
-            <Text>Choose an action for this step:</Text>
+            <Box direction="horizontal" alignment="space-between">
+              <Heading>Add Step</Heading>
+              <Icon name="category" color="primary" />
+            </Box>
+            <Text color="muted" size="sm">Choose an action for this step</Text>
             <Divider />
-            <Button name="step-swap">Swap tokens</Button>
-            <Button name="step-bridge">Bridge cross-chain</Button>
-            <Button name="step-deposit">Deposit (Aave/Morpho)</Button>
-            <Button name="step-stake">Stake (Lido/EtherFi)</Button>
+            <Section>
+              <Button name="step-swap" variant="primary">
+                <Icon name="swap-horizontal" size="inherit" />
+                {' Swap tokens'}
+              </Button>
+              <Button name="step-bridge">
+                <Icon name="bridge" size="inherit" />
+                {' Bridge cross-chain'}
+              </Button>
+              <Button name="step-deposit">
+                <Icon name="money" size="inherit" />
+                {' Deposit (Aave/Morpho)'}
+              </Button>
+              <Button name="step-stake">
+                <Icon name="stake" size="inherit" />
+                {' Stake (Lido/EtherFi)'}
+              </Button>
+            </Section>
             <Divider />
-            <Button name="back-home">Back</Button>
+            <Button name="back-home">
+              <Icon name="arrow-left" size="inherit" />
+              {' Back'}
+            </Button>
           </Box>
         ));
         return;
@@ -74,11 +97,23 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         const actionName = (event.name ?? '').replace('step-', '');
         await updateUI(id, (
           <Box>
-            <Heading>{`${actionName.charAt(0).toUpperCase()}${actionName.slice(1)}`}</Heading>
-            <Text>This action type will be available soon.</Text>
-            <Divider />
-            <Button name="add-step">Back to Actions</Button>
-            <Button name="back-home">Home</Button>
+            <Box direction="horizontal" alignment="space-between">
+              <Heading>{`${actionName.charAt(0).toUpperCase()}${actionName.slice(1)}`}</Heading>
+              <Icon name="clock" color="muted" />
+            </Box>
+            <Banner title="Coming Soon" severity="info">
+              <Text>This action type will be available soon.</Text>
+            </Banner>
+            <Section>
+              <Button name="add-step" variant="primary">
+                <Icon name="arrow-left" size="inherit" />
+                {' Back to Actions'}
+              </Button>
+              <Button name="back-home">
+                <Icon name="home" size="inherit" />
+                {' Home'}
+              </Button>
+            </Section>
           </Box>
         ));
         return;
@@ -94,25 +129,39 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         if (saved.length === 0) {
           await updateUI(id, (
             <Box>
-              <Heading>No Saved Workflows</Heading>
-              <Text>You haven't saved any workflows yet.</Text>
-              <Button name="back-home">Back</Button>
+              <Banner title="No Saved Workflows" severity="warning">
+                <Text>You haven't saved any workflows yet.</Text>
+              </Banner>
+              <Button name="back-home">
+                <Icon name="home" size="inherit" />
+                {' Back'}
+              </Button>
             </Box>
           ));
           return;
         }
         await updateUI(id, (
           <Box>
-            <Heading>Saved Workflows</Heading>
-            <Text>{`${saved.length} workflow${saved.length === 1 ? '' : 's'} saved.`}</Text>
+            <Box direction="horizontal" alignment="space-between">
+              <Heading>Saved Workflows</Heading>
+              <Icon name="download" color="primary" />
+            </Box>
+            <Text color="muted" size="sm">
+              {`${saved.length} workflow${saved.length === 1 ? '' : 's'} saved`}
+            </Text>
             <Divider />
-            {saved.map((w) => (
-              <Button name={`load-${w.id}`}>
-                {`${w.name} (${w.steps.length} steps)`}
-              </Button>
-            ))}
+            <Section>
+              {saved.map((w) => (
+                <Button name={`load-${w.id}`}>
+                  {`${w.name} (${w.steps.length} steps)`}
+                </Button>
+              ))}
+            </Section>
             <Divider />
-            <Button name="back-home">Back</Button>
+            <Button name="back-home">
+              <Icon name="arrow-left" size="inherit" />
+              {' Back'}
+            </Button>
           </Box>
         ));
         return;
@@ -122,15 +171,25 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         const workflow = state.currentWorkflow;
         await updateUI(id, (
           <Box>
-            <Heading>Save Workflow</Heading>
+            <Box direction="horizontal" alignment="space-between">
+              <Heading>Save Workflow</Heading>
+              <Icon name="save" color="primary" />
+            </Box>
+            <Divider />
             <Form name="save-form">
               <Field label="Workflow Name">
                 <Input name="workflowName" placeholder={workflow?.name ?? 'My Workflow'} />
               </Field>
-              <Button name="submit-save">Save</Button>
+              <Button name="submit-save" variant="primary">
+                <Icon name="save" size="inherit" />
+                {' Save'}
+              </Button>
             </Form>
             <Divider />
-            <Button name="back-home">Cancel</Button>
+            <Button name="back-home">
+              <Icon name="arrow-left" size="inherit" />
+              {' Cancel'}
+            </Button>
           </Box>
         ));
         return;
@@ -149,9 +208,13 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         if (!wf) {
           await updateUI(id, (
             <Box>
-              <Heading>No Workflow</Heading>
-              <Text>No active workflow to save.</Text>
-              <Button name="back-home">Back</Button>
+              <Banner title="No Workflow" severity="warning">
+                <Text>No active workflow to save.</Text>
+              </Banner>
+              <Button name="back-home">
+                <Icon name="home" size="inherit" />
+                {' Back'}
+              </Button>
             </Box>
           ));
           return;
@@ -170,9 +233,13 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
 
         await updateUI(id, (
           <Box>
-            <Heading>Workflow Saved</Heading>
-            <Text>{`"${saveName}" saved with ${saved.steps.length} step(s).`}</Text>
-            <Button name="back-home">Back to Home</Button>
+            <Banner title="Workflow Saved" severity="success">
+              <Text>{`"${saveName}" saved with ${saved.steps.length} step(s).`}</Text>
+            </Banner>
+            <Button name="back-home" variant="primary">
+              <Icon name="home" size="inherit" />
+              {' Back to Home'}
+            </Button>
           </Box>
         ));
         return;
@@ -216,10 +283,13 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         id,
         ui: (
           <Box>
-            <Heading>Error</Heading>
-            <Text>{msg}</Text>
-            <Divider />
-            <Button name="back-home">Back to Home</Button>
+            <Banner title="Error" severity="danger">
+              <Text>{msg}</Text>
+            </Banner>
+            <Button name="back-home" variant="primary">
+              <Icon name="home" size="inherit" />
+              {' Back to Home'}
+            </Button>
           </Box>
         ),
       },
@@ -244,12 +314,17 @@ export const onInstall: OnInstallHandler = async () => {
       type: 'alert',
       content: (
         <Box>
-          <Heading>Welcome to Surecast</Heading>
+          <Box direction="horizontal" alignment="space-between">
+            <Heading size="lg">Welcome to Surecast</Heading>
+            <Icon name="flash" color="primary" />
+          </Box>
           <Text>
-            Build multi-step DeFi workflows and execute them in a single
-            transaction.
+            Build multi-step DeFi workflows and execute them seamlessly.
           </Text>
-          <Text>Open the Surecast home page from MetaMask to get started.</Text>
+          <Divider />
+          <Text color="muted" size="sm">
+            Open the Surecast home page from MetaMask to get started.
+          </Text>
         </Box>
       ),
     },
