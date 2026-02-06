@@ -23,6 +23,7 @@ export function renderHome(state: SnapState) {
     <Box>
       <Heading>Surecast</Heading>
       <Text>DeFi workflow composer</Text>
+      {state.userEns ? <Text>{`ENS: ${state.userEns}`}</Text> : null}
       <Divider />
       {workflow ? (
         <Box>
@@ -48,6 +49,7 @@ export function renderHome(state: SnapState) {
       <Button name="add-step">Add Step</Button>
       {steps.length > 0 && <Button name="get-quote">Get Quote</Button>}
       {steps.length > 0 && <Button name="save-workflow">Save Workflow</Button>}
+      {state.userEns && steps.length > 0 ? <Text>Open executor page to save to ENS.</Text> : null}
       {(state.workflows?.length ?? 0) > 0 && (
         <Button name="load-workflow">Load Saved</Button>
       )}

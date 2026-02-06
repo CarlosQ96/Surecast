@@ -14,6 +14,7 @@ import {
   useRequestSnap,
 } from '../hooks';
 import { isLocalSnap, shouldDisplayReconnectButton } from '../utils';
+import { namehash, encodeGetText, decodeTextResult, ENS_PUBLIC_RESOLVER, ENS_WORKFLOW_KEY } from '../utils/ens';
 
 // ============================================================
 // TYPES
@@ -361,6 +362,12 @@ const Index = () => {
   const [workflow, setWorkflow] = useState<FullWorkflow | null>(null);
   const [execution, setExecution] = useState<WorkflowExecution | null>(null);
 
+  // ENS state
+  const [ensName, setEnsName] = useState<string | null>(null);
+  const [ensStatus, setEnsStatus] = useState('');
+  const [ensTxHash, setEnsTxHash] = useState<string | null>(null);
+  const [loadEnsInput, setLoadEnsInput] = useState('');
+
   // Ref to allow cancellation of in-progress execution
   const cancelledRef = useRef(false);
 
@@ -376,10 +383,14 @@ const Index = () => {
     })) as string[] | null;
 
     if (accounts?.[0]) {
-      await invokeSnap({
+      const ensResult = (await invokeSnap({
         method: 'setUserAddress',
         params: { address: accounts[0] },
-      });
+      })) as { success: boolean; ens: string | null } | null;
+
+      if (ensResult?.ens) {
+        setEnsName(ensResult.ens);
+      }
     }
 
     const wf = (await invokeSnap({
@@ -709,6 +720,116 @@ const Index = () => {
   }, [provider, invokeSnap, workflow, execution, runSteps]);
 
   // ============================================================
+  // ENS: SAVE WORKFLOW TO ENS
+  // ============================================================
+
+  const saveToEns = useCallback(async () => {
+    if (!provider || !ensName) return;
+
+    setEnsStatus('Preparing ENS transaction...');
+    setEnsTxHash(null);
+
+    try {
+      const accounts = (await provider.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
+      if (!accounts?.[0]) {
+        setEnsStatus('No wallet accounts found.');
+        return;
+      }
+
+      // Compute namehash on site side (keccak256 available here, not in snap SES)
+      const node = namehash(ensName);
+
+      // Tell snap to prepare the setText transaction
+      await invokeSnap({
+        method: 'prepareEnsSave',
+        params: { namehash: node },
+      });
+
+      // Get the prepared transaction
+      const txData = (await invokeSnap({
+        method: 'getPreparedTransaction',
+      })) as PreparedTransaction;
+
+      // Switch to mainnet for ENS
+      setEnsStatus('Switching to Ethereum mainnet...');
+      await switchChain(1);
+
+      // Send the transaction
+      setEnsStatus('Confirm setText transaction in MetaMask...');
+      const hash = (await provider.request({
+        method: 'eth_sendTransaction',
+        params: [
+          {
+            from: accounts[0],
+            to: txData.to,
+            value: txData.value,
+            data: txData.data,
+          },
+        ],
+      })) as string;
+
+      await invokeSnap({ method: 'clearPreparedTransaction' });
+
+      setEnsTxHash(hash);
+      setEnsStatus(`Saved to ${ensName}!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEnsStatus(`ENS save failed: ${msg}`);
+    }
+  }, [provider, ensName, invokeSnap, switchChain]);
+
+  // ============================================================
+  // ENS: LOAD WORKFLOW FROM ENS
+  // ============================================================
+
+  const loadFromEns = useCallback(async (name: string) => {
+    if (!provider || !name) return;
+
+    setEnsStatus(`Loading workflow from ${name}...`);
+    setEnsTxHash(null);
+
+    try {
+      // Switch to mainnet for the eth_call
+      await switchChain(1);
+
+      // Compute namehash and encode the text() call
+      const node = namehash(name);
+      const callData = encodeGetText(node, ENS_WORKFLOW_KEY);
+
+      // Read the text record via eth_call (free, no gas)
+      const result = (await provider.request({
+        method: 'eth_call',
+        params: [
+          { to: ENS_PUBLIC_RESOLVER, data: callData },
+          'latest',
+        ],
+      })) as string;
+
+      const workflowJson = decodeTextResult(result);
+
+      if (!workflowJson) {
+        setEnsStatus(`No workflow found on ${name}.`);
+        return;
+      }
+
+      // Import into snap
+      await invokeSnap({
+        method: 'importWorkflow',
+        params: { workflowJson },
+      });
+
+      // Refresh UI
+      await syncWithSnap();
+      setEnsStatus(`Loaded workflow from ${name}!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEnsStatus(`ENS load failed: ${msg}`);
+    }
+  }, [provider, invokeSnap, switchChain, syncWithSnap]);
+
+  // ============================================================
   // RESET
   // ============================================================
 
@@ -874,6 +995,84 @@ const Index = () => {
                 Reset
               </button>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ENS Section */}
+      {installedSnap && (
+        <div style={{
+          ...getExecutorBoxStyle(ensTxHash ? 'success' : ensStatus.includes('failed') ? 'error' : 'idle'),
+          marginTop: '1.5rem',
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem', color: '#212529' }}>
+            ENS Workflow Sharing
+          </h3>
+
+          {ensName ? (
+            <p style={txDescriptionStyle}>
+              Your ENS: <strong>{ensName}</strong>
+            </p>
+          ) : (
+            <p style={txDescriptionStyle}>
+              No ENS name detected. Connect a wallet with an ENS name to save workflows on-chain.
+            </p>
+          )}
+
+          {ensName && workflowInfo && (
+            <button
+              style={executeButtonStyle}
+              onClick={saveToEns}
+            >
+              Save Workflow to ENS
+            </button>
+          )}
+
+          <div style={{ marginTop: '1rem' }}>
+            <p style={txDescriptionStyle}>Load a workflow from any ENS name:</p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="vitalik.eth"
+                value={loadEnsInput}
+                onChange={(e) => setLoadEnsInput(e.target.value)}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  fontSize: '0.95rem',
+                  width: '200px',
+                }}
+              />
+              <button
+                style={{
+                  ...executeButtonStyle,
+                  marginTop: 0,
+                  opacity: loadEnsInput ? 1 : 0.5,
+                }}
+                onClick={() => loadFromEns(loadEnsInput)}
+                disabled={!loadEnsInput}
+              >
+                Load
+              </button>
+            </div>
+          </div>
+
+          {ensStatus && (
+            <p style={{ ...statusMessageStyle, marginTop: '0.75rem' }}>
+              {ensStatus}
+            </p>
+          )}
+
+          {ensTxHash && (
+            <a
+              href={getBlockExplorerUrl(1, ensTxHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: '0.9rem', color: '#007bff' }}
+            >
+              View transaction on Etherscan
+            </a>
           )}
         </div>
       )}

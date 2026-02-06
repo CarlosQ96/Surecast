@@ -2,6 +2,13 @@ import type { OnRpcRequestHandler } from '@metamask/snaps-sdk';
 
 import { CHAINS } from './data/chains';
 import { TOKENS } from './data/tokens';
+import {
+  ENS_PUBLIC_RESOLVER,
+  ENS_WORKFLOW_KEY,
+  encodeSetText,
+  serializeWorkflow,
+  deserializeWorkflow,
+} from './services/ens';
 import { getSwapQuote } from './services/lifi';
 import { getState, setState } from './state';
 import { parseAmount } from './helpers';
@@ -242,6 +249,42 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
       const updated = { ...wf, steps: filtered, updatedAt: Date.now() };
       await setState({ currentWorkflow: updated });
       return { success: true };
+    }
+
+    case 'prepareEnsSave': {
+      const params = request.params as { namehash: string } | undefined;
+      if (!params?.namehash) throw new Error('Missing namehash parameter.');
+
+      const s = await getState();
+      const wf = s.currentWorkflow;
+      if (!wf || wf.steps.length === 0) {
+        throw new Error('No workflow with steps to save.');
+      }
+
+      const serialized = serializeWorkflow(wf);
+      const callData = encodeSetText(params.namehash, ENS_WORKFLOW_KEY, serialized);
+
+      await setState({
+        preparedTx: {
+          to: ENS_PUBLIC_RESOLVER,
+          data: callData,
+          value: '0x0',
+          chainId: 1,
+          type: 'ens-write',
+          description: `Save workflow "${wf.name}" to ENS`,
+        },
+      });
+
+      return { success: true, key: ENS_WORKFLOW_KEY };
+    }
+
+    case 'importWorkflow': {
+      const params = request.params as { workflowJson: string } | undefined;
+      if (!params?.workflowJson) throw new Error('Missing workflowJson parameter.');
+
+      const imported = deserializeWorkflow(params.workflowJson);
+      await setState({ currentWorkflow: imported });
+      return imported;
     }
 
     default:
