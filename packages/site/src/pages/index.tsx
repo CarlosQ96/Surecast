@@ -14,7 +14,14 @@ import {
   useRequestSnap,
 } from '../hooks';
 import { isLocalSnap, shouldDisplayReconnectButton } from '../utils';
-import { namehash, encodeGetText, decodeTextResult, ENS_PUBLIC_RESOLVER, ENS_WORKFLOW_KEY } from '../utils/ens';
+import {
+  readEnsText,
+  lookupEnsName,
+  computeNamehash,
+  slugify,
+  getWorkflowKey,
+  ENS_WORKFLOW_KEY_LEGACY,
+} from '../utils/ens';
 
 // ============================================================
 // TYPES
@@ -408,6 +415,9 @@ const Index = () => {
   const [ensStatus, setEnsStatus] = useState('');
   const [ensTxHash, setEnsTxHash] = useState<string | null>(null);
   const [loadEnsInput, setLoadEnsInput] = useState('');
+  const [loadEnsSlug, setLoadEnsSlug] = useState('');
+  const [savedWorkflows, setSavedWorkflows] = useState<FullWorkflow[]>([]);
+  const [ensSlugPreview, setEnsSlugPreview] = useState<string | null>(null);
 
   // Ref to allow cancellation of in-progress execution
   const cancelledRef = useRef(false);
@@ -424,26 +434,40 @@ const Index = () => {
     })) as string[] | null;
 
     if (accounts?.[0]) {
-      const ensResult = (await invokeSnap({
+      // Set address in snap
+      await invokeSnap({
         method: 'setUserAddress',
         params: { address: accounts[0] },
-      })) as { success: boolean; ens: string | null } | null;
+      });
 
-      if (ensResult?.ens) {
-        setEnsName(ensResult.ens);
+      // Reverse lookup via viem (more reliable than ensideas.com API)
+      try {
+        const ens = await lookupEnsName(accounts[0]);
+        if (ens) {
+          setEnsName(ens);
+        }
+      } catch {
+        // ENS reverse lookup is best-effort
       }
     }
 
-    const wf = (await invokeSnap({
+    const currentWorkflow = (await invokeSnap({
       method: 'getCurrentWorkflow',
     })) as { name: string; steps: unknown[] } | null;
 
-    if (wf) {
+    if (currentWorkflow) {
       setWorkflowInfo({
-        name: wf.name,
-        stepCount: wf.steps?.length ?? 0,
+        name: currentWorkflow.name,
+        stepCount: currentWorkflow.steps?.length ?? 0,
       });
+      setEnsSlugPreview(slugify(currentWorkflow.name));
     }
+
+    // Fetch all saved workflows for ENS picker
+    const allWorkflows = (await invokeSnap({
+      method: 'getWorkflows',
+    })) as FullWorkflow[] | null;
+    setSavedWorkflows(allWorkflows ?? []);
   }, [installedSnap, invokeSnap, provider]);
 
   useEffect(() => {
@@ -764,7 +788,7 @@ const Index = () => {
   // ENS: SAVE WORKFLOW TO ENS
   // ============================================================
 
-  const saveToEns = useCallback(async () => {
+  const saveToEns = useCallback(async (workflowSlug?: string) => {
     if (!provider || !ensName) return;
 
     setEnsStatus('Preparing ENS transaction...');
@@ -779,13 +803,19 @@ const Index = () => {
         return;
       }
 
-      // Compute namehash on site side (keccak256 available here, not in snap SES)
-      const node = namehash(ensName);
+      // Compute namehash on site side (with normalization via viem)
+      const node = computeNamehash(ensName);
 
-      // Tell snap to prepare the setText transaction
+      // Tell snap to prepare the setText transaction with slug
+      const ensKey = workflowSlug ? getWorkflowKey(workflowSlug) : undefined;
+      setEnsStatus(`Saving as ${ensKey ?? 'auto-slug'}...`);
+
       await invokeSnap({
         method: 'prepareEnsSave',
-        params: { namehash: node },
+        params: {
+          namehash: node,
+          ...(workflowSlug ? { slug: workflowSlug } : {}),
+        },
       });
 
       // Get the prepared transaction
@@ -825,33 +855,27 @@ const Index = () => {
   // ENS: LOAD WORKFLOW FROM ENS
   // ============================================================
 
-  const loadFromEns = useCallback(async (name: string) => {
-    if (!provider || !name) return;
+  const loadFromEns = useCallback(async (ensOwner: string, workflowSlug: string) => {
+    if (!ensOwner) return;
 
-    setEnsStatus(`Loading workflow from ${name}...`);
+    const ensKey = workflowSlug
+      ? getWorkflowKey(workflowSlug)
+      : ENS_WORKFLOW_KEY_LEGACY;
+
+    setEnsStatus(`Loading "${ensKey}" from ${ensOwner}...`);
     setEnsTxHash(null);
 
     try {
-      // Switch to mainnet for the eth_call
-      await switchChain(1);
+      // Try slug-based key first
+      let workflowJson = await readEnsText(ensOwner, ensKey);
 
-      // Compute namehash and encode the text() call
-      const node = namehash(name);
-      const callData = encodeGetText(node, ENS_WORKFLOW_KEY);
-
-      // Read the text record via eth_call (free, no gas)
-      const result = (await provider.request({
-        method: 'eth_call',
-        params: [
-          { to: ENS_PUBLIC_RESOLVER, data: callData },
-          'latest',
-        ],
-      })) as string;
-
-      const workflowJson = decodeTextResult(result);
+      // Fallback to legacy key if slug-based not found and slug was provided
+      if (!workflowJson && workflowSlug) {
+        workflowJson = await readEnsText(ensOwner, ENS_WORKFLOW_KEY_LEGACY);
+      }
 
       if (!workflowJson) {
-        setEnsStatus(`No workflow found on ${name}.`);
+        setEnsStatus(`No workflow found on ${ensOwner} (key: ${ensKey}).`);
         return;
       }
 
@@ -863,12 +887,12 @@ const Index = () => {
 
       // Refresh UI
       await syncWithSnap();
-      setEnsStatus(`Loaded workflow from ${name}!`);
+      setEnsStatus(`Loaded workflow from ${ensOwner}!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setEnsStatus(`ENS load failed: ${msg}`);
     }
-  }, [provider, invokeSnap, switchChain, syncWithSnap]);
+  }, [invokeSnap, syncWithSnap]);
 
   // ============================================================
   // RESET
@@ -1070,41 +1094,103 @@ const Index = () => {
           )}
 
           {ensName && workflowInfo && (
-            <button
-              style={primaryButtonStyle}
-              onClick={saveToEns}
-            >
-              Save Workflow to ENS
-            </button>
+            <div style={{ marginTop: '0.5rem' }}>
+              <p style={txDescriptionStyle}>
+                Current: <strong>{workflowInfo.name}</strong>
+                {ensSlugPreview && (
+                  <span style={{ color: COLORS.grayMid }}>
+                    {` → ${getWorkflowKey(ensSlugPreview)}`}
+                  </span>
+                )}
+              </p>
+              <button
+                style={primaryButtonStyle}
+                onClick={() => saveToEns(ensSlugPreview ?? undefined)}
+              >
+                Save Current Workflow to ENS
+              </button>
+            </div>
+          )}
+
+          {ensName && savedWorkflows.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <p style={txDescriptionStyle}>Or save a different workflow:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                {savedWorkflows.map((savedWorkflow) => (
+                  <button
+                    key={savedWorkflow.id}
+                    style={{
+                      ...primaryButtonStyle,
+                      marginTop: 0,
+                      fontSize: '0.9rem',
+                      padding: '0.5rem 1rem',
+                      backgroundColor: COLORS.grayDark,
+                    }}
+                    onClick={async () => {
+                      // Load this workflow as current, then save
+                      await invokeSnap({
+                        method: 'loadWorkflow',
+                        params: { workflowId: savedWorkflow.id },
+                      });
+                      await syncWithSnap();
+                      await saveToEns(slugify(savedWorkflow.name));
+                    }}
+                  >
+                    {`${savedWorkflow.name} (${savedWorkflow.steps.length} steps)`}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <div style={{ marginTop: '1rem' }}>
             <p style={txDescriptionStyle}>Load a workflow from any ENS name:</p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-              <input
-                type="text"
-                placeholder="vitalik.eth"
-                value={loadEnsInput}
-                onChange={(e) => setLoadEnsInput(e.target.value)}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  border: `1px solid ${COLORS.grayLight}`,
-                  borderRadius: '4px',
-                  fontSize: '0.95rem',
-                  width: '200px',
-                  fontFamily: 'inherit',
-                }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder="vitalik.eth"
+                  value={loadEnsInput}
+                  onChange={(e) => setLoadEnsInput(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: `1px solid ${COLORS.grayLight}`,
+                    borderRadius: '4px',
+                    fontSize: '0.95rem',
+                    width: '180px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="workflow-slug (optional)"
+                  value={loadEnsSlug}
+                  onChange={(e) => setLoadEnsSlug(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: `1px solid ${COLORS.grayLight}`,
+                    borderRadius: '4px',
+                    fontSize: '0.95rem',
+                    width: '180px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              {loadEnsSlug && (
+                <p style={{ ...txDescriptionStyle, fontSize: '0.8rem', margin: 0 }}>
+                  Key: {getWorkflowKey(loadEnsSlug)}
+                </p>
+              )}
               <button
                 style={{
                   ...primaryButtonStyle,
                   marginTop: 0,
                   opacity: loadEnsInput ? 1 : 0.5,
                 }}
-                onClick={() => loadFromEns(loadEnsInput)}
+                onClick={() => loadFromEns(loadEnsInput, loadEnsSlug)}
                 disabled={!loadEnsInput}
               >
-                Load
+                Load from ENS
               </button>
             </div>
           </div>

@@ -4,14 +4,15 @@ import { CHAINS } from './data/chains';
 import { TOKENS } from './data/tokens';
 import {
   ENS_PUBLIC_RESOLVER,
-  ENS_WORKFLOW_KEY,
   encodeSetText,
   serializeWorkflow,
   deserializeWorkflow,
+  slugify,
+  getWorkflowKey,
 } from './services/ens';
 import { getSwapQuote } from './services/lifi';
 import { getState, setState } from './state';
-import { parseAmount } from './helpers';
+import { parseAmount, generateId } from './helpers';
 import type { WorkflowExecution, StepExecutionStatus } from './types';
 
 export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
@@ -252,7 +253,7 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
     }
 
     case 'prepareEnsSave': {
-      const params = request.params as { namehash: string } | undefined;
+      const params = request.params as { namehash: string; slug?: string } | undefined;
       if (!params?.namehash) throw new Error('Missing namehash parameter.');
 
       const s = await getState();
@@ -261,8 +262,10 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
         throw new Error('No workflow with steps to save.');
       }
 
+      const workflowSlug = params.slug || slugify(wf.name);
+      const ensKey = getWorkflowKey(workflowSlug);
       const serialized = serializeWorkflow(wf);
-      const callData = encodeSetText(params.namehash, ENS_WORKFLOW_KEY, serialized);
+      const callData = encodeSetText(params.namehash, ensKey, serialized);
 
       await setState({
         preparedTx: {
@@ -271,11 +274,11 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
           value: '0x0',
           chainId: 1,
           type: 'ens-write',
-          description: `Save workflow "${wf.name}" to ENS`,
+          description: `Save workflow "${wf.name}" to ENS (${ensKey})`,
         },
       });
 
-      return { success: true, key: ENS_WORKFLOW_KEY };
+      return { success: true, key: ensKey, slug: workflowSlug };
     }
 
     case 'importWorkflow': {
@@ -285,6 +288,47 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
       const imported = deserializeWorkflow(params.workflowJson);
       await setState({ currentWorkflow: imported });
       return imported;
+    }
+
+    case 'deleteWorkflow': {
+      const params = request.params as { workflowId: string } | undefined;
+      if (!params?.workflowId) throw new Error('Missing workflowId parameter.');
+
+      const s = await getState();
+      const filtered = s.workflows.filter((w) => w.id !== params.workflowId);
+
+      // If deleting the active workflow, clear it
+      const isCurrent = s.currentWorkflow?.id === params.workflowId;
+      await setState({
+        workflows: filtered,
+        ...(isCurrent ? { currentWorkflow: null } : {}),
+      });
+
+      return { success: true, remaining: filtered.length };
+    }
+
+    case 'loadWorkflow': {
+      const params = request.params as { workflowId: string } | undefined;
+      if (!params?.workflowId) throw new Error('Missing workflowId parameter.');
+
+      const s = await getState();
+      const target = s.workflows.find((w) => w.id === params.workflowId);
+      if (!target) throw new Error('Workflow not found.');
+
+      await setState({ currentWorkflow: target });
+      return target;
+    }
+
+    case 'newWorkflow': {
+      const newWf = {
+        id: generateId(),
+        name: 'Untitled Workflow',
+        steps: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await setState({ currentWorkflow: newWf });
+      return newWf;
     }
 
     default:

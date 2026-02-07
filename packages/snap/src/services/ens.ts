@@ -3,7 +3,29 @@ import { generateId } from '../helpers';
 
 // ENS Public Resolver on mainnet
 export const ENS_PUBLIC_RESOLVER = '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63';
-export const ENS_WORKFLOW_KEY = 'com.surecast.workflow';
+
+// Legacy single-workflow key (backward compat for reading)
+export const ENS_WORKFLOW_KEY_LEGACY = 'com.surecast.workflow';
+
+/**
+ * Convert a workflow name to a URL-safe slug for ENS keys.
+ * Lowercase, hyphens for spaces/special chars, max 32 chars.
+ */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+}
+
+/**
+ * Build an ENS text record key for a specific workflow.
+ * e.g. slugify("Yield Optimizer") => "com.surecast.workflow.yield-optimizer"
+ */
+export function getWorkflowKey(slug: string): string {
+  return `com.surecast.workflow.${slug}`;
+}
 
 // ============================================================
 // ABI ENCODING HELPERS

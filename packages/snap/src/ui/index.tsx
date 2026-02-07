@@ -111,6 +111,10 @@ export function renderHome(state: SnapState) {
             {' Load Saved'}
           </Button>
         ) : null}
+        <Button name="new-workflow">
+          <Icon name="add" size="inherit" />
+          {' New Workflow'}
+        </Button>
       </Section>
 
       {state.userEns && steps.length > 0 ? (
@@ -181,15 +185,60 @@ export function renderSwapForm(existingStepCount: number) {
         >
           <Input name="amount" placeholder="10" />
         </Field>
-        <Button name="submit-swap" variant="primary">
-          <Icon name="add" size="inherit" />
-          {' Add to Workflow'}
-        </Button>
       </Form>
+      <Button name="submit-swap" variant="primary">
+        <Icon name="add" size="inherit" />
+        {' Add to Workflow'}
+      </Button>
       <Divider />
       <Button name="back-home">
         <Icon name="arrow-left" size="inherit" />
         {' Cancel'}
+      </Button>
+    </Box>
+  );
+}
+
+export function renderSavedWorkflows(
+  workflows: SnapState['workflows'],
+  banner?: { title: string; text: string },
+) {
+  return (
+    <Box>
+      <Box direction="horizontal" alignment="space-between">
+        <Heading>Saved Workflows</Heading>
+        <Icon name="download" color="primary" />
+      </Box>
+      {banner ? (
+        <Banner title={banner.title} severity="success">
+          <Text>{banner.text}</Text>
+        </Banner>
+      ) : null}
+      <Text color="muted" size="sm">
+        {`${workflows.length} workflow${workflows.length === 1 ? '' : 's'} saved`}
+      </Text>
+      <Divider />
+      <Section>
+        {workflows.map((w) => (
+          <Box>
+            <Button name={`load-${w.id}`}>
+              {`${w.name} (${w.steps.length} steps)`}
+            </Button>
+            <Button
+              name={`delete-workflow-${w.id}`}
+              variant="destructive"
+              size="sm"
+            >
+              <Icon name="trash" size="inherit" />
+              {' Delete'}
+            </Button>
+          </Box>
+        ))}
+      </Section>
+      <Divider />
+      <Button name="back-home">
+        <Icon name="arrow-left" size="inherit" />
+        {' Back'}
       </Button>
     </Box>
   );

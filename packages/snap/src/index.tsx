@@ -13,15 +13,20 @@ import {
   Section,
   Icon,
   Banner,
-  Form,
-  Field,
-  Input,
 } from '@metamask/snaps-sdk/jsx';
 
-import { getState, setState } from './state';
+import { getState, setState, writeState } from './state';
+/* setState only used by onInstall; getState returns from cache after first call */
 import { generateId } from './helpers';
 import { renderHome, renderSwapForm, updateUI } from './ui';
-import { handleSwapSubmit, handleGetQuote } from './handlers';
+import {
+  handleSwapSubmit,
+  handleGetQuote,
+  handleSaveWorkflow,
+  handleSubmitSave,
+  handleLoadWorkflow,
+  handleDeleteWorkflow,
+} from './handlers';
 
 export { onRpcRequest } from './rpc';
 
@@ -36,15 +41,32 @@ export const onHomePage: OnHomePageHandler = async () => {
 
 export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
   try {
-    const state = await getState();
-
+    // Only handle button clicks (PolkaGate pattern)
     if (event.type !== UserInputEventType.ButtonClickEvent) {
       return;
     }
 
+    // 1) Read interface state once at top — gets all form values (1 SES call)
+    const interfaceState = await snap.request({
+      method: 'snap_getInterfaceState',
+      params: { id },
+    });
+    const formState = interfaceState as Record<string, Record<string, string>>;
+    const swapForm = formState?.['swap-form'] ?? {};
+    const saveForm = formState?.['save-form'] ?? {};
+
+    // 2) Read persistent state from cache (0 SES calls after first load)
+    const state = await getState();
+
+    // 3) Route by button name — each case does 1-2 SES calls max
     switch (event.name) {
       case 'submit-swap': {
-        await handleSwapSubmit(id, state);
+        await handleSwapSubmit(id, state, swapForm);
+        return;
+      }
+
+      case 'submit-save': {
+        await handleSubmitSave(id, state, saveForm);
         return;
       }
 
@@ -124,130 +146,31 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         return;
       }
 
+      case 'new-workflow': {
+        const newWorkflow = {
+          id: generateId(),
+          name: 'Untitled Workflow',
+          steps: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        const newState = await writeState(state, { currentWorkflow: newWorkflow });
+        await updateUI(id, renderHome(newState));
+        return;
+      }
+
       case 'load-workflow': {
-        const saved = state.workflows;
-        if (saved.length === 0) {
-          await updateUI(id, (
-            <Box>
-              <Banner title="No Saved Workflows" severity="warning">
-                <Text>You haven't saved any workflows yet.</Text>
-              </Banner>
-              <Button name="back-home">
-                <Icon name="home" size="inherit" />
-                {' Back'}
-              </Button>
-            </Box>
-          ));
-          return;
-        }
-        await updateUI(id, (
-          <Box>
-            <Box direction="horizontal" alignment="space-between">
-              <Heading>Saved Workflows</Heading>
-              <Icon name="download" color="primary" />
-            </Box>
-            <Text color="muted" size="sm">
-              {`${saved.length} workflow${saved.length === 1 ? '' : 's'} saved`}
-            </Text>
-            <Divider />
-            <Section>
-              {saved.map((w) => (
-                <Button name={`load-${w.id}`}>
-                  {`${w.name} (${w.steps.length} steps)`}
-                </Button>
-              ))}
-            </Section>
-            <Divider />
-            <Button name="back-home">
-              <Icon name="arrow-left" size="inherit" />
-              {' Back'}
-            </Button>
-          </Box>
-        ));
+        await handleLoadWorkflow(id, state);
         return;
       }
 
       case 'save-workflow': {
-        const workflow = state.currentWorkflow;
-        await updateUI(id, (
-          <Box>
-            <Box direction="horizontal" alignment="space-between">
-              <Heading>Save Workflow</Heading>
-              <Icon name="save" color="primary" />
-            </Box>
-            <Divider />
-            <Form name="save-form">
-              <Field label="Workflow Name">
-                <Input name="workflowName" placeholder={workflow?.name ?? 'My Workflow'} />
-              </Field>
-              <Button name="submit-save" variant="primary">
-                <Icon name="save" size="inherit" />
-                {' Save'}
-              </Button>
-            </Form>
-            <Divider />
-            <Button name="back-home">
-              <Icon name="arrow-left" size="inherit" />
-              {' Cancel'}
-            </Button>
-          </Box>
-        ));
-        return;
-      }
-
-      case 'submit-save': {
-        const saveFormState = await snap.request({
-          method: 'snap_getInterfaceState',
-          params: { id },
-        }) as Record<string, Record<string, string | null>>;
-
-        const saveVals = (saveFormState?.['save-form'] ?? {}) as Record<string, string | null>;
-        const saveName = String(saveVals.workflowName ?? '').trim() || 'Untitled Workflow';
-
-        const wf = state.currentWorkflow;
-        if (!wf) {
-          await updateUI(id, (
-            <Box>
-              <Banner title="No Workflow" severity="warning">
-                <Text>No active workflow to save.</Text>
-              </Banner>
-              <Button name="back-home">
-                <Icon name="home" size="inherit" />
-                {' Back'}
-              </Button>
-            </Box>
-          ));
-          return;
-        }
-
-        const saved = { ...wf, name: saveName, updatedAt: Date.now() };
-        const workflows = [...state.workflows];
-        const existingIdx = workflows.findIndex((w) => w.id === saved.id);
-        if (existingIdx >= 0) {
-          workflows[existingIdx] = saved;
-        } else {
-          workflows.push(saved);
-        }
-
-        await setState({ currentWorkflow: saved, workflows });
-
-        await updateUI(id, (
-          <Box>
-            <Banner title="Workflow Saved" severity="success">
-              <Text>{`"${saveName}" saved with ${saved.steps.length} step(s).`}</Text>
-            </Banner>
-            <Button name="back-home" variant="primary">
-              <Icon name="home" size="inherit" />
-              {' Back to Home'}
-            </Button>
-          </Box>
-        ));
+        await handleSaveWorkflow(id, state);
         return;
       }
 
       case 'back-home': {
-        const freshState = await getState();
-        await updateUI(id, renderHome(freshState));
+        await updateUI(id, renderHome(state));
         return;
       }
 
@@ -255,21 +178,22 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         const name = event.name ?? '';
         if (name.startsWith('load-')) {
           const workflowId = name.replace('load-', '');
-          const target = state.workflows.find((w) => w.id === workflowId);
+          const target = state.workflows.find((workflow) => workflow.id === workflowId);
           if (target) {
-            await setState({ currentWorkflow: target });
-            const updated = await getState();
-            await updateUI(id, renderHome(updated));
+            const loadedState = await writeState(state, { currentWorkflow: target });
+            await updateUI(id, renderHome(loadedState));
           }
+        } else if (name.startsWith('delete-workflow-')) {
+          const workflowId = name.replace('delete-workflow-', '');
+          await handleDeleteWorkflow(id, workflowId, state);
         } else if (name.startsWith('delete-step-')) {
           const stepId = name.replace('delete-step-', '');
-          const workflow = state.currentWorkflow;
-          if (workflow) {
-            const filtered = workflow.steps.filter((s) => s.id !== stepId);
-            const updated = { ...workflow, steps: filtered, updatedAt: Date.now() };
-            await setState({ currentWorkflow: updated });
-            const freshState = await getState();
-            await updateUI(id, renderHome(freshState));
+          const currentWorkflow = state.currentWorkflow;
+          if (currentWorkflow) {
+            const filteredSteps = currentWorkflow.steps.filter((step) => step.id !== stepId);
+            const updatedWorkflow = { ...currentWorkflow, steps: filteredSteps, updatedAt: Date.now() };
+            const updatedState = await writeState(state, { currentWorkflow: updatedWorkflow });
+            await updateUI(id, renderHome(updatedState));
           }
         }
         break;
@@ -277,23 +201,27 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await snap.request({
-      method: 'snap_updateInterface',
-      params: {
-        id,
-        ui: (
-          <Box>
-            <Banner title="Error" severity="danger">
-              <Text>{msg}</Text>
-            </Banner>
-            <Button name="back-home" variant="primary">
-              <Icon name="home" size="inherit" />
-              {' Back to Home'}
-            </Button>
-          </Box>
-        ),
-      },
-    });
+    try {
+      await snap.request({
+        method: 'snap_updateInterface',
+        params: {
+          id,
+          ui: (
+            <Box>
+              <Banner title="Error" severity="danger">
+                <Text>{msg}</Text>
+              </Banner>
+              <Button name="back-home" variant="primary">
+                <Icon name="home" size="inherit" />
+                {' Back to Home'}
+              </Button>
+            </Box>
+          ),
+        },
+      });
+    } catch {
+      console.error('Snap error (UI update also failed):', msg);
+    }
   }
 };
 

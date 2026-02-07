@@ -9,32 +9,31 @@ import {
   Icon,
   Banner,
   Spinner,
+  Form,
+  Field,
+  Input,
 } from '@metamask/snaps-sdk/jsx';
+/* Form/Field/Input still used by handleSaveWorkflow UI */
 
 import { CHAINS, CHAIN_NAMES } from '../data/chains';
 import { TOKENS } from '../data/tokens';
 import { getSwapQuote, formatTokenAmount } from '../services/lifi';
-import { setState } from '../state';
+import { writeState } from '../state';
 import type { SnapState, WorkflowStep } from '../types';
 import { generateId, chainNameToId, parseAmount } from '../helpers';
-import { updateUI } from '../ui';
+import { renderHome, renderSavedWorkflows, updateUI } from '../ui';
 
 export async function handleSwapSubmit(
   id: string,
   state: SnapState,
+  formValues: Record<string, string>,
 ) {
-  const formState = await snap.request({
-    method: 'snap_getInterfaceState',
-    params: { id },
-  }) as Record<string, Record<string, string | null>>;
-
-  const vals = (formState?.['swap-form'] ?? {}) as Record<string, string | null>;
-  const fromChain = chainNameToId(String(vals.fromChain ?? 'Arbitrum'));
-  const toChain = chainNameToId(String(vals.toChain ?? 'Arbitrum'));
-  const fromSymbol = String(vals.fromToken ?? 'ETH');
-  const toSymbol = String(vals.toToken ?? 'USDC');
-  const humanAmount = String(vals.amount ?? '').trim();
-  const useAll = String(vals.useAllFromPrevious ?? 'No') === 'Yes';
+  const fromChain = chainNameToId(formValues.fromChain ?? 'Arbitrum');
+  const toChain = chainNameToId(formValues.toChain ?? 'Arbitrum');
+  const fromSymbol = formValues.fromToken ?? 'ETH';
+  const toSymbol = formValues.toToken ?? 'USDC';
+  const humanAmount = (formValues.amount ?? '').trim();
+  const useAll = (formValues.useAllFromPrevious ?? 'No') === 'Yes';
 
   // Validate amount (skip if chaining from previous step)
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
@@ -142,7 +141,7 @@ export async function handleSwapSubmit(
     updatedAt: Date.now(),
   };
 
-  await setState({ currentWorkflow: updated });
+  await writeState(state, { currentWorkflow: updated });
 
   const amountLabel = useAll ? 'all from previous step' : `${humanAmount} ${fromSymbol}`;
   await updateUI(id, (
@@ -257,7 +256,7 @@ export async function handleGetQuote(id: string, state: SnapState) {
 
     // For single-step workflows, also store prepared tx for backward compat
     if (workflow.steps.length === 1) {
-      await setState({
+      await writeState(state, {
         quote: { raw: JSON.stringify(quote) },
         preparedTx: quote.tx,
       });
@@ -317,5 +316,106 @@ export async function handleGetQuote(id: string, state: SnapState) {
         </Button>
       </Box>
     ));
+  }
+}
+
+export async function handleSaveWorkflow(id: string, state: SnapState) {
+  const workflow = state.currentWorkflow;
+  const existingSave = state.workflows.find((w) => w.id === workflow?.id);
+  await updateUI(id, (
+    <Box>
+      <Box direction="horizontal" alignment="space-between">
+        <Heading>Save Workflow</Heading>
+        <Icon name="save" color="primary" />
+      </Box>
+      {existingSave ? (
+        <Text color="muted" size="sm">{`Updating "${existingSave.name}"`}</Text>
+      ) : null}
+      <Divider />
+      <Form name="save-form">
+        <Field label="Workflow Name">
+          <Input name="workflowName" value={workflow?.name ?? 'My Workflow'} placeholder="My Workflow" />
+        </Field>
+      </Form>
+      <Button name="submit-save" variant="primary">
+        <Icon name="save" size="inherit" />
+        {existingSave ? ' Update' : ' Save'}
+      </Button>
+      <Divider />
+      <Button name="back-home">
+        <Icon name="arrow-left" size="inherit" />
+        {' Cancel'}
+      </Button>
+    </Box>
+  ));
+}
+
+export async function handleSubmitSave(id: string, state: SnapState, formValues: Record<string, string>) {
+  const saveName = (formValues.workflowName ?? '').trim() || 'Untitled Workflow';
+
+  const currentWorkflow = state.currentWorkflow;
+  if (!currentWorkflow) {
+    await updateUI(id, (
+      <Box>
+        <Banner title="No Workflow" severity="warning">
+          <Text>No active workflow to save.</Text>
+        </Banner>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
+      </Box>
+    ));
+    return;
+  }
+
+  const savedWorkflow = { ...currentWorkflow, name: saveName, updatedAt: Date.now() };
+  const workflows = [...state.workflows];
+  const existingIndex = workflows.findIndex((workflow) => workflow.id === savedWorkflow.id);
+  if (existingIndex >= 0) {
+    workflows[existingIndex] = savedWorkflow;
+  } else {
+    workflows.push(savedWorkflow);
+  }
+
+  const updatedState = await writeState(state, { currentWorkflow: savedWorkflow, workflows });
+  await updateUI(id, renderHome(updatedState));
+}
+
+export async function handleLoadWorkflow(id: string, state: SnapState) {
+  const saved = state.workflows;
+  if (saved.length === 0) {
+    await updateUI(id, (
+      <Box>
+        <Banner title="No Saved Workflows" severity="warning">
+          <Text>You haven't saved any workflows yet.</Text>
+        </Banner>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
+      </Box>
+    ));
+    return;
+  }
+  await updateUI(id, renderSavedWorkflows(saved));
+}
+
+export async function handleDeleteWorkflow(id: string, workflowId: string, state: SnapState) {
+  const filtered = state.workflows.filter((w) => w.id !== workflowId);
+  const isCurrent = state.currentWorkflow?.id === workflowId;
+
+  const updatedState = await writeState(state, {
+    workflows: filtered,
+    ...(isCurrent ? { currentWorkflow: null } : {}),
+  });
+
+  if (filtered.length > 0) {
+    await updateUI(id, renderSavedWorkflows(filtered, {
+      title: 'Deleted',
+      text: 'Workflow removed.',
+    }));
+  } else {
+    await updateUI(id, renderHome(updatedState));
   }
 }
