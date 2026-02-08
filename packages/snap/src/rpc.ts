@@ -5,13 +5,18 @@ import { TOKENS } from './data/tokens';
 import {
   ENS_PUBLIC_RESOLVER,
   ENS_WORKFLOW_KEY_LEGACY,
+  ENS_MANIFEST_KEY,
   encodeSetText,
+  encodeMulticall,
   serializeWorkflow,
   deserializeWorkflow,
+  serializeManifest,
+  deserializeManifest,
   readEnsText,
   slugify,
   getWorkflowKey,
 } from './services/ens';
+import type { ManifestEntry } from './services/ens';
 import { getSwapQuote } from './services/lifi';
 import { getState, setState } from './state';
 import { parseAmount, generateId } from './helpers';
@@ -31,6 +36,7 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
       const params = request.params as {
         address: string;
         namehash?: string;
+        ens?: string;
       } | undefined;
       if (!params?.address) {
         throw new Error('Missing address parameter.');
@@ -38,22 +44,28 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
       await setState({
         userAddress: params.address,
         ...(params.namehash ? { userNamehash: params.namehash } : {}),
+        ...(params.ens ? { userEns: params.ens } : {}),
       });
 
-      let ens: string | null = null;
-      try {
-        const res = await fetch(
-          `https://api.ensideas.com/ens/resolve/${params.address}`,
-        );
-        if (res.ok) {
-          const data = (await res.json()) as { name?: string };
-          if (data.name) {
-            ens = data.name;
-            await setState({ userEns: ens });
+      // If site already provided ENS name, use it directly
+      let ens: string | null = params.ens ?? null;
+
+      // Fallback: try ensideas.com only if site didn't provide ENS
+      if (!ens) {
+        try {
+          const res = await fetch(
+            `https://api.ensideas.com/ens/resolve/${params.address}`,
+          );
+          if (res.ok) {
+            const data = (await res.json()) as { name?: string };
+            if (data.name) {
+              ens = data.name;
+              await setState({ userEns: ens });
+            }
           }
+        } catch {
+          // ENS lookup is best-effort
         }
-      } catch {
-        // ENS lookup is best-effort
       }
 
       return { success: true, ens };
@@ -235,7 +247,11 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
     }
 
     case 'prepareEnsSave': {
-      const params = request.params as { namehash: string; slug?: string } | undefined;
+      const params = request.params as {
+        namehash: string;
+        slug?: string;
+        manifest?: string;
+      } | undefined;
       if (!params?.namehash) throw new Error('Missing namehash parameter.');
 
       const s = await getState();
@@ -247,16 +263,43 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
       const workflowSlug = params.slug || slugify(wf.name);
       const ensKey = getWorkflowKey(workflowSlug);
       const serialized = serializeWorkflow(wf);
-      const callData = encodeSetText(params.namehash, ensKey, serialized);
+
+      // Build setText for the workflow data
+      const workflowCall = encodeSetText(params.namehash, ensKey, serialized);
+
+      // Build updated manifest: merge existing + new entry
+      let manifestEntries: ManifestEntry[] = [];
+      if (params.manifest) {
+        try {
+          manifestEntries = deserializeManifest(params.manifest);
+        } catch {
+          // start fresh if manifest is corrupted
+        }
+      }
+      // Add or update entry for this workflow
+      const existing = manifestEntries.findIndex((entry) => entry.slug === workflowSlug);
+      if (existing >= 0) {
+        manifestEntries[existing] = { slug: workflowSlug, name: wf.name };
+      } else {
+        manifestEntries.push({ slug: workflowSlug, name: wf.name });
+      }
+      const manifestCall = encodeSetText(
+        params.namehash,
+        ENS_MANIFEST_KEY,
+        serializeManifest(manifestEntries),
+      );
+
+      // Multicall: batch both setText calls into one transaction
+      const multicallData = encodeMulticall([workflowCall, manifestCall]);
 
       await setState({
         preparedTx: {
           to: ENS_PUBLIC_RESOLVER,
-          data: callData,
+          data: multicallData,
           value: '0x0',
           chainId: 1,
           type: 'ens-write',
-          description: `Save workflow "${wf.name}" to ENS (${ensKey})`,
+          description: `Save "${wf.name}" to ENS (${ensKey})`,
         },
       });
 

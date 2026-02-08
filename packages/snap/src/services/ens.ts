@@ -7,6 +7,9 @@ export const ENS_PUBLIC_RESOLVER = '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63';
 // Legacy single-workflow key (backward compat for reading)
 export const ENS_WORKFLOW_KEY_LEGACY = 'com.surecast.workflow';
 
+// Manifest key: tracks all saved workflow slugs+names
+export const ENS_MANIFEST_KEY = 'com.surecast.workflows';
+
 /**
  * Convert a workflow name to a URL-safe slug for ENS keys.
  * Lowercase, hyphens for spaces/special chars, max 32 chars.
@@ -243,4 +246,68 @@ export function deserializeWorkflow(json: string): Workflow {
     createdAt: compact.ts,
     updatedAt: Date.now(),
   };
+}
+
+// ============================================================
+// MANIFEST SERIALIZATION
+// ============================================================
+
+export type ManifestEntry = { slug: string; name: string };
+
+/** Compact format: [["slug","Name"],["slug2","Name 2"]] */
+export function serializeManifest(entries: ManifestEntry[]): string {
+  return JSON.stringify(entries.map((entry) => [entry.slug, entry.name]));
+}
+
+export function deserializeManifest(json: string): ManifestEntry[] {
+  const parsed = JSON.parse(json) as string[][];
+  return parsed.map(([slug, name]) => ({ slug: slug ?? '', name: name ?? '' }));
+}
+
+// ============================================================
+// MULTICALL ENCODING
+// ============================================================
+
+/**
+ * ABI-encode a multicall(bytes[] calldata data) call.
+ * Selector: 0xac9650d8 — supported by ENS Public Resolver.
+ * Batches multiple calldata items into one transaction.
+ *
+ * Layout: selector | offset-to-array | array-length |
+ *         offset0 | offset1 | ... | item0 | item1 | ...
+ * Offsets are relative to the start of the offsets section (after array-length).
+ */
+export function encodeMulticall(calls: string[]): string {
+  const selector = 'ac9650d8';
+
+  const rawCalls = calls.map((call) =>
+    call.startsWith('0x') ? call.slice(2) : call,
+  );
+
+  const arrayOffset = encodeUint256(32);
+  const arrayLength = encodeUint256(rawCalls.length);
+
+  // Offsets skip past all offset words: N items × 32 bytes each
+  let tailOffset = rawCalls.length * 32;
+  const heads: string[] = [];
+  const tails: string[] = [];
+
+  for (const rawCall of rawCalls) {
+    heads.push(encodeUint256(tailOffset));
+
+    const byteLength = rawCall.length / 2;
+    const paddedBytes = Math.ceil(byteLength / 32) * 32 || 32;
+    tails.push(encodeUint256(byteLength) + padRight(rawCall, paddedBytes));
+
+    tailOffset += 32 + paddedBytes; // length word (32 bytes) + padded data
+  }
+
+  return (
+    '0x' +
+    selector +
+    arrayOffset +
+    arrayLength +
+    heads.join('') +
+    tails.join('')
+  );
 }

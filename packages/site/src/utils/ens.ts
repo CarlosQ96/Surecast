@@ -13,6 +13,9 @@ const ENS_PUBLIC_RESOLVER = '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63';
 /** Legacy single-workflow key (backward compat for loading old records). */
 export const ENS_WORKFLOW_KEY_LEGACY = 'com.surecast.workflow';
 
+/** Manifest key: tracks all saved workflow slugs+names on ENS. */
+export const ENS_MANIFEST_KEY = 'com.surecast.workflows';
+
 // ============================================================
 // PURE HELPERS
 // ============================================================

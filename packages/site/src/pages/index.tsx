@@ -17,8 +17,10 @@ import { isLocalSnap, shouldDisplayReconnectButton } from '../utils';
 import {
   lookupEnsName,
   computeNamehash,
+  readEnsText,
   slugify,
   getWorkflowKey,
+  ENS_MANIFEST_KEY,
 } from '../utils/ens';
 
 // ============================================================
@@ -109,6 +111,70 @@ function loadFromLocal(): FullWorkflow | null {
     return json ? (JSON.parse(json) as FullWorkflow) : null;
   } catch {
     return null;
+  }
+}
+
+// ============================================================
+// ENS MANIFEST (localStorage-backed list of saved ENS workflows)
+// ============================================================
+
+type EnsManifestEntry = { slug: string; name: string };
+
+function getManifestKey(ensName: string): string {
+  return `surecast-ens-manifest:${ensName.toLowerCase()}`;
+}
+
+function getLocalManifest(ensName: string): EnsManifestEntry[] {
+  try {
+    const json = localStorage.getItem(getManifestKey(ensName));
+    return json ? (JSON.parse(json) as EnsManifestEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addToLocalManifest(
+  ensName: string,
+  slug: string,
+  name: string,
+): EnsManifestEntry[] {
+  const entries = getLocalManifest(ensName);
+  const existingIdx = entries.findIndex((entry) => entry.slug === slug);
+  if (existingIdx >= 0) {
+    entries[existingIdx] = { slug, name };
+  } else {
+    entries.push({ slug, name });
+  }
+  try {
+    localStorage.setItem(getManifestKey(ensName), JSON.stringify(entries));
+  } catch {
+    // localStorage may be full
+  }
+  return entries;
+}
+
+function deserializeManifest(json: string): EnsManifestEntry[] {
+  const parsed = JSON.parse(json) as string[][];
+  return parsed.map(([slug, name]) => ({ slug: slug ?? '', name: name ?? '' }));
+}
+
+function getCheckedKey(ensName: string): string {
+  return `surecast-ens-checked:${ensName.toLowerCase()}`;
+}
+
+function wasManifestChecked(ensName: string): boolean {
+  try {
+    return localStorage.getItem(getCheckedKey(ensName)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markManifestChecked(ensName: string): void {
+  try {
+    localStorage.setItem(getCheckedKey(ensName), '1');
+  } catch {
+    // localStorage may be full
   }
 }
 
@@ -440,6 +506,8 @@ const Index = () => {
   const [loadEnsSlug, setLoadEnsSlug] = useState('');
   const [ensSlugPreview, setEnsSlugPreview] = useState<string | null>(null);
   const [pendingEnsTx, setPendingEnsTx] = useState<PreparedTransaction | null>(null);
+  const [myEnsWorkflows, setMyEnsWorkflows] = useState<EnsManifestEntry[]>([]);
+  const [manualEnsInput, setManualEnsInput] = useState('');
 
   // Ref to allow cancellation of in-progress execution
   const cancelledRef = useRef(false);
@@ -451,28 +519,75 @@ const Index = () => {
   const syncWithSnap = useCallback(async () => {
     if (!installedSnap) return;
 
+    let ens: string | null = null;
+
     const accounts = (await provider?.request({
       method: 'eth_requestAccounts',
     })) as string[] | null;
 
     if (accounts?.[0]) {
       // Reverse lookup for ENS name
-      let ens: string | null = null;
       try {
         ens = await lookupEnsName(accounts[0]);
-        if (ens) setEnsName(ens);
+        if (ens) {
+          setEnsName(ens);
+          // Load manifest from localStorage (instant, no RPCs)
+          const localManifest = getLocalManifest(ens);
+          setMyEnsWorkflows(localManifest);
+
+          // Auto-refresh from on-chain if localStorage manifest is empty and not yet checked
+          if (localManifest.length === 0 && !wasManifestChecked(ens)) {
+            try {
+              const manifestJson = await readEnsText(ens, ENS_MANIFEST_KEY);
+              if (manifestJson) {
+                const entries = deserializeManifest(manifestJson);
+                for (const entry of entries) {
+                  addToLocalManifest(ens, entry.slug, entry.name);
+                }
+                setMyEnsWorkflows(getLocalManifest(ens));
+              }
+            } catch {
+              // best-effort — manifest read can fail
+            }
+            markManifestChecked(ens);
+          }
+        }
       } catch {
         // ENS reverse lookup is best-effort
       }
 
-      // Set address + namehash in snap (namehash needed for ENS save from snap)
-      await invokeSnap({
+      // Set address + namehash + ens name in snap
+      const setUserResult = (await invokeSnap({
         method: 'setUserAddress',
         params: {
           address: accounts[0],
-          ...(ens ? { namehash: computeNamehash(ens) } : {}),
+          ...(ens ? { namehash: computeNamehash(ens), ens } : {}),
         },
-      });
+      })) as { ens?: string | null } | null;
+
+      // Fallback: snap may detect ENS via ensideas.com when on-chain reverse lookup fails
+      if (!ens && setUserResult?.ens) {
+        ens = setUserResult.ens;
+        setEnsName(ens);
+        const localManifest = getLocalManifest(ens);
+        setMyEnsWorkflows(localManifest);
+
+        if (localManifest.length === 0 && !wasManifestChecked(ens)) {
+          try {
+            const manifestJson = await readEnsText(ens, ENS_MANIFEST_KEY);
+            if (manifestJson) {
+              const entries = deserializeManifest(manifestJson);
+              for (const entry of entries) {
+                addToLocalManifest(ens, entry.slug, entry.name);
+              }
+              setMyEnsWorkflows(getLocalManifest(ens));
+            }
+          } catch {
+            // best-effort
+          }
+          markManifestChecked(ens);
+        }
+      }
     }
 
     let currentWorkflow = (await invokeSnap({
@@ -515,9 +630,57 @@ const Index = () => {
       const pendingTx = (await invokeSnap({
         method: 'getPreparedTransaction',
       })) as PreparedTransaction | null;
-      if (pendingTx && (pendingTx as PreparedTransaction & { type?: string }).type === 'ens-write') {
-        setPendingEnsTx(pendingTx);
-        setEnsStatus(pendingTx.description ?? 'Pending ENS save — confirm below.');
+
+      if (pendingTx) {
+        const txType = (pendingTx as PreparedTransaction & { type?: string }).type;
+
+        if (txType === 'ens-save-request') {
+          // Snap queued a save request — site completes it with namehash
+          // Try local ens first, then snap's stored ens as fallback
+          let resolvedEns = ens;
+          if (!resolvedEns) {
+            try {
+              const snapState = (await invokeSnap({ method: 'getState' })) as { userEns?: string } | null;
+              if (snapState?.userEns) {
+                resolvedEns = snapState.userEns;
+                setEnsName(resolvedEns);
+              }
+            } catch {
+              // best-effort
+            }
+          }
+
+          if (resolvedEns) {
+            const node = computeNamehash(resolvedEns);
+            let currentManifest: string | null = null;
+            try {
+              currentManifest = await readEnsText(resolvedEns, ENS_MANIFEST_KEY);
+            } catch {
+              // start fresh
+            }
+            await invokeSnap({
+              method: 'prepareEnsSave',
+              params: {
+                namehash: node,
+                ...(currentManifest ? { manifest: currentManifest } : {}),
+              },
+            });
+            // Re-read the now-complete prepared tx
+            const completedTx = (await invokeSnap({
+              method: 'getPreparedTransaction',
+            })) as PreparedTransaction | null;
+            if (completedTx) {
+              setPendingEnsTx(completedTx);
+              setEnsStatus(completedTx.description ?? 'ENS save ready — confirm below.');
+            }
+          } else {
+            // No ENS available — show the request description so user knows it's pending
+            setEnsStatus(`${pendingTx.description ?? 'ENS save pending'} — no ENS name detected.`);
+          }
+        } else if (txType === 'ens-write') {
+          setPendingEnsTx(pendingTx);
+          setEnsStatus(pendingTx.description ?? 'Pending ENS save — confirm below.');
+        }
       }
     } catch {
       // best-effort
@@ -857,18 +1020,27 @@ const Index = () => {
         return;
       }
 
-      // Compute namehash on site side (with normalization via viem)
+      // Compute namehash on site side
       const node = computeNamehash(ensName);
 
-      // Tell snap to prepare the setText transaction with slug
+      // Read current manifest from ENS directly (site-side, no snap RPC)
+      let currentManifest: string | null = null;
+      try {
+        currentManifest = await readEnsText(ensName, ENS_MANIFEST_KEY);
+      } catch {
+        // start fresh if read fails
+      }
+
       const ensKey = workflowSlug ? getWorkflowKey(workflowSlug) : undefined;
       setEnsStatus(`Saving as ${ensKey ?? 'auto-slug'}...`);
 
+      // Pass manifest to snap so it can build multicall (workflow + manifest update)
       await invokeSnap({
         method: 'prepareEnsSave',
         params: {
           namehash: node,
           ...(workflowSlug ? { slug: workflowSlug } : {}),
+          ...(currentManifest ? { manifest: currentManifest } : {}),
         },
       });
 
@@ -881,8 +1053,8 @@ const Index = () => {
       setEnsStatus('Switching to Ethereum mainnet...');
       await switchChain(1);
 
-      // Send the transaction
-      setEnsStatus('Confirm setText transaction in MetaMask...');
+      // Send the transaction (multicall: workflow + manifest in one tx)
+      setEnsStatus('Confirm transaction in MetaMask...');
       const hash = (await provider.request({
         method: 'eth_sendTransaction',
         params: [
@@ -897,13 +1069,19 @@ const Index = () => {
 
       await invokeSnap({ method: 'clearPreparedTransaction' });
 
+      // Update local manifest (instant, no RPCs)
+      const saveName = workflowInfo?.name ?? 'Untitled';
+      const saveSlug = workflowSlug ?? slugify(saveName);
+      const updatedManifest = addToLocalManifest(ensName, saveSlug, saveName);
+      setMyEnsWorkflows(updatedManifest);
+
       setEnsTxHash(hash);
       setEnsStatus(`Saved to ${ensName}!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setEnsStatus(`ENS save failed: ${msg}`);
     }
-  }, [provider, ensName, invokeSnap, switchChain]);
+  }, [provider, ensName, invokeSnap, switchChain, workflowInfo]);
 
   // ============================================================
   // ENS: CONFIRM PENDING ENS SAVE (prepared from snap UI)
@@ -985,6 +1163,112 @@ const Index = () => {
       setEnsStatus(`ENS load failed: ${msg}`);
     }
   }, [invokeSnap]);
+
+  // Load a workflow from your own ENS by slug (site reads directly, 1 snap RPC to import)
+  const loadMyEnsWorkflow = useCallback(async (slug: string) => {
+    if (!ensName) return;
+
+    setEnsStatus(`Loading "${slug}" from ${ensName}...`);
+    setEnsTxHash(null);
+
+    try {
+      const ensKey = getWorkflowKey(slug);
+      const workflowJson = await readEnsText(ensName, ensKey);
+      if (!workflowJson) {
+        setEnsStatus(`No workflow found at ${ensKey}`);
+        return;
+      }
+
+      // Import into snap via existing RPC (1 call)
+      const imported = (await invokeSnap({
+        method: 'importWorkflow',
+        params: { workflowJson },
+      })) as FullWorkflow;
+
+      setWorkflowInfo({
+        name: imported.name,
+        stepCount: imported.steps?.length ?? 0,
+      });
+      setEnsSlugPreview(slugify(imported.name));
+      saveToLocal(imported);
+      setEnsStatus(`Loaded "${imported.name}" from ${ensName}!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEnsStatus(`Load failed: ${msg}`);
+    }
+  }, [ensName, invokeSnap]);
+
+  // Refresh manifest from on-chain ENS (recovery if localStorage is lost)
+  const refreshEnsManifest = useCallback(async () => {
+    if (!ensName) return;
+
+    setEnsStatus('Reading manifest from ENS...');
+    try {
+      const manifestJson = await readEnsText(ensName, ENS_MANIFEST_KEY);
+      if (manifestJson) {
+        const entries = deserializeManifest(manifestJson);
+        // Save to localStorage for future use
+        for (const entry of entries) {
+          addToLocalManifest(ensName, entry.slug, entry.name);
+        }
+        setMyEnsWorkflows(getLocalManifest(ensName));
+        setEnsStatus(`Found ${entries.length} workflow${entries.length === 1 ? '' : 's'} on ENS.`);
+      } else {
+        setEnsStatus('No workflow manifest found on ENS.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEnsStatus(`Manifest refresh failed: ${msg}`);
+    }
+  }, [ensName]);
+
+  // Set ENS name manually (when reverse lookup fails)
+  const setEnsManually = useCallback(async (name: string) => {
+    if (!name || !name.includes('.')) return;
+
+    setEnsName(name);
+    setManualEnsInput('');
+    setEnsStatus(`ENS set to ${name}`);
+
+    // Pass to snap
+    try {
+      const accounts = (await provider?.request({
+        method: 'eth_requestAccounts',
+      })) as string[] | null;
+      if (accounts?.[0]) {
+        await invokeSnap({
+          method: 'setUserAddress',
+          params: {
+            address: accounts[0],
+            namehash: computeNamehash(name),
+            ens: name,
+          },
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
+    // Fetch manifest from on-chain
+    const localManifest = getLocalManifest(name);
+    setMyEnsWorkflows(localManifest);
+    if (localManifest.length === 0 && !wasManifestChecked(name)) {
+      try {
+        const manifestJson = await readEnsText(name, ENS_MANIFEST_KEY);
+        if (manifestJson) {
+          const entries = deserializeManifest(manifestJson);
+          for (const entry of entries) {
+            addToLocalManifest(name, entry.slug, entry.name);
+          }
+          setMyEnsWorkflows(getLocalManifest(name));
+          setEnsStatus(`${name} — found ${entries.length} workflow${entries.length === 1 ? '' : 's'}`);
+        }
+      } catch {
+        // best-effort
+      }
+      markManifestChecked(name);
+    }
+  }, [provider, invokeSnap]);
 
   // ============================================================
   // RESET
@@ -1216,9 +1500,51 @@ const Index = () => {
               Your ENS: <strong>{ensName}</strong>
             </p>
           ) : (
-            <p style={txDescriptionStyle}>
-              No ENS name detected. Connect a wallet with an ENS name to save workflows on-chain.
-            </p>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <p style={txDescriptionStyle}>
+                No ENS name detected automatically.{' '}
+                <a
+                  href="https://app.ens.domains"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: COLORS.primary, fontWeight: 500 }}
+                >
+                  Get one at app.ens.domains
+                </a>
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder="yourname.eth"
+                  value={manualEnsInput}
+                  onChange={(e) => setManualEnsInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && manualEnsInput) {
+                      setEnsManually(manualEnsInput);
+                    }
+                  }}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: `1px solid ${COLORS.grayLight}`,
+                    borderRadius: '4px',
+                    fontSize: '0.95rem',
+                    width: '200px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <button
+                  style={{
+                    ...primaryButtonStyle,
+                    marginTop: 0,
+                    opacity: manualEnsInput ? 1 : 0.5,
+                  }}
+                  onClick={() => setEnsManually(manualEnsInput)}
+                  disabled={!manualEnsInput}
+                >
+                  Set ENS
+                </button>
+              </div>
+            </div>
           )}
 
           {ensName && workflowInfo && (
@@ -1240,8 +1566,62 @@ const Index = () => {
             </div>
           )}
 
+          {ensName && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <p style={{ ...txDescriptionStyle, margin: 0, fontWeight: 600 }}>
+                  Your ENS Workflows
+                </p>
+                <button
+                  style={{ ...retryButtonStyle, fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                  onClick={refreshEnsManifest}
+                >
+                  Refresh from ENS
+                </button>
+              </div>
+              {myEnsWorkflows.length === 0 ? (
+                <p style={{ ...txDescriptionStyle, fontSize: '0.85rem', color: COLORS.grayMid }}>
+                  No workflows saved to ENS yet.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center' }}>
+                  {myEnsWorkflows.map((entry) => (
+                    <div
+                      key={entry.slug}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.4rem 0.75rem',
+                        border: `1px solid ${COLORS.grayLight}`,
+                        borderRadius: '4px',
+                        width: '100%',
+                        maxWidth: '400px',
+                      }}
+                    >
+                      <div style={{ textAlign: 'left' }}>
+                        <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{entry.name}</span>
+                        <br />
+                        <span style={{ fontSize: '0.75rem', color: COLORS.grayMid }}>
+                          {getWorkflowKey(entry.slug)}
+                        </span>
+                      </div>
+                      <button
+                        style={{ ...primaryButtonStyle, fontSize: '0.8rem', padding: '0.3rem 0.6rem', marginTop: 0 }}
+                        onClick={() => loadMyEnsWorkflow(entry.slug)}
+                      >
+                        Load
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ marginTop: '1rem' }}>
-            <p style={txDescriptionStyle}>Load a workflow from any ENS name:</p>
+            <p style={txDescriptionStyle}>Load from another ENS name:</p>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                 <input

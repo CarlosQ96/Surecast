@@ -17,11 +17,17 @@ import { getSwapQuote, formatTokenAmount } from '../services/lifi';
 import { writeState } from '../state';
 import {
   ENS_PUBLIC_RESOLVER,
+  ENS_MANIFEST_KEY,
   encodeSetText,
+  encodeMulticall,
   serializeWorkflow,
+  serializeManifest,
+  deserializeManifest,
+  readEnsText,
   slugify,
   getWorkflowKey,
 } from '../services/ens';
+import type { ManifestEntry } from '../services/ens';
 import type { SnapState, WorkflowStep } from '../types';
 import { generateId, chainNameToId, parseAmount } from '../helpers';
 import { renderHome, renderWorkflowList, updateUI } from '../ui';
@@ -449,15 +455,27 @@ export async function handleSaveToEns(id: string, state: SnapState) {
     return;
   }
 
-  if (!state.userNamehash || !state.userEns) {
+  // If snap doesn't have the namehash yet, store a save request for the site to complete
+  if (!state.userNamehash) {
+    await writeState(state, {
+      preparedTx: {
+        to: ENS_PUBLIC_RESOLVER,
+        data: '',
+        value: '0x0',
+        chainId: 1,
+        type: 'ens-save-request',
+        description: `Save "${workflow.name}" to ENS`,
+      },
+    });
+
     await updateUI(id, (
       <Box>
-        <Banner title="No ENS" severity="warning">
-          <Text>Connect a wallet with an ENS name on the Surecast site first.</Text>
+        <Banner title="ENS Save Queued" severity="success">
+          <Text>{`"${workflow.name}" will be saved when you open the Surecast site.`}</Text>
         </Banner>
         <Button name="back-home">
           <Icon name="home" size="inherit" />
-          {' Back'}
+          {' Back to Home'}
         </Button>
       </Box>
     ));
@@ -467,12 +485,41 @@ export async function handleSaveToEns(id: string, state: SnapState) {
   const workflowSlug = slugify(workflow.name);
   const ensKey = getWorkflowKey(workflowSlug);
   const serialized = serializeWorkflow(workflow);
-  const callData = encodeSetText(state.userNamehash, ensKey, serialized);
+
+  // Build setText for the workflow data
+  const workflowCall = encodeSetText(state.userNamehash, ensKey, serialized);
+
+  // Read existing manifest from ENS, merge in this workflow
+  let manifestEntries: ManifestEntry[] = [];
+  try {
+    const manifestJson = await readEnsText(state.userNamehash, ENS_MANIFEST_KEY);
+    if (manifestJson) {
+      manifestEntries = deserializeManifest(manifestJson);
+    }
+  } catch {
+    // start fresh if read fails
+  }
+
+  const existingIdx = manifestEntries.findIndex((entry) => entry.slug === workflowSlug);
+  if (existingIdx >= 0) {
+    manifestEntries[existingIdx] = { slug: workflowSlug, name: workflow.name };
+  } else {
+    manifestEntries.push({ slug: workflowSlug, name: workflow.name });
+  }
+
+  const manifestCall = encodeSetText(
+    state.userNamehash,
+    ENS_MANIFEST_KEY,
+    serializeManifest(manifestEntries),
+  );
+
+  // Multicall: batch both setText calls into one transaction
+  const multicallData = encodeMulticall([workflowCall, manifestCall]);
 
   await writeState(state, {
     preparedTx: {
       to: ENS_PUBLIC_RESOLVER,
-      data: callData,
+      data: multicallData,
       value: '0x0',
       chainId: 1,
       type: 'ens-write',
@@ -483,7 +530,7 @@ export async function handleSaveToEns(id: string, state: SnapState) {
   await updateUI(id, (
     <Box>
       <Banner title="ENS Save Prepared" severity="success">
-        <Text>{`Ready to save "${workflow.name}" to ${state.userEns}`}</Text>
+        <Text>{`Ready to save "${workflow.name}" to ${state.userEns ?? 'ENS'}`}</Text>
       </Banner>
       <Text color="muted" size="sm">{`Key: ${ensKey}`}</Text>
       <Text color="muted" size="sm">Open the Surecast site to confirm the transaction.</Text>
