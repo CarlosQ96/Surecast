@@ -138,7 +138,7 @@ export function renderHome(state: SnapState) {
 
         {/* ENS Sharing */}
         {steps.length > 0 ? (
-          <>
+          <Box>
             <Divider />
             <Section>
               <Banner title="ENS Sharing" severity="info">
@@ -154,7 +154,7 @@ export function renderHome(state: SnapState) {
                 {' Save to ENS'}
               </Button>
             </Section>
-          </>
+          </Box>
         ) : null}
       </Box>
     </Container>
