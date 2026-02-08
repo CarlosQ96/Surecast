@@ -2,6 +2,13 @@
 
 DeFi workflow composer for MetaMask Snaps. Compose multi-step DeFi workflows (swap, bridge, deposit, stake), persist them to ENS text records, and execute seamlessly across 5 EVM chains.
 
+## Quick Start (Judges)
+
+1. Open a **separate browser profile** (Chrome/Firefox) with [MetaMask Flask](https://metamask.io/flask/) installed — do NOT use a profile that has regular MetaMask, as they conflict
+2. Go to **https://surecast-production.up.railway.app/**
+3. Click **Connect** to install the Surecast snap
+4. Open the Surecast home page from MetaMask's Snap UI to compose workflows
+
 ## What It Does
 
 Surecast lets you build reusable DeFi workflows inside MetaMask:
