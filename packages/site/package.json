@@ -10,7 +10,8 @@
     "lint:eslint": "eslint . --cache",
     "lint:fix": "pnpm lint:eslint --fix && pnpm lint:misc --write",
     "lint:misc": "prettier '**/*.json' '**/*.md' '**/*.yml' --ignore-path ../../.gitignore --no-error-on-unmatched-pattern",
-    "start": "GATSBY_TELEMETRY_DISABLED=1 gatsby develop"
+    "start": "GATSBY_TELEMETRY_DISABLED=1 gatsby develop",
+    "serve": "GATSBY_TELEMETRY_DISABLED=1 gatsby serve -H 0.0.0.0 -p ${PORT:-8000}"
   },
   "browserslist": {
     "production": [
