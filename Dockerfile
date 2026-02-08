@@ -23,6 +23,5 @@ RUN npm install -g serve@14
 WORKDIR /app
 COPY --from=builder /app/packages/site/public ./public
 
-ENV PORT=3000
 EXPOSE 3000
-CMD serve public -l $PORT -s
+CMD serve public -l ${PORT:-3000} -s
