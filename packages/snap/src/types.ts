@@ -72,12 +72,12 @@ export type WorkflowExecution = {
 };
 
 export type SnapState = {
-  workflows: Workflow[];
   currentWorkflow: Workflow | null;
+  savedWorkflows: Workflow[];
   preparedTx: PreparedTransaction | null;
-  quote: Record<string, string | number | boolean | null> | null;
   userAddress: string | null;
   userEns: string | null;
+  userNamehash: string | null;
   preferences: {
     slippage: number;
     defaultChain: number;

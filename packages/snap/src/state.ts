@@ -3,12 +3,12 @@ import type { Json } from '@metamask/snaps-sdk';
 import type { SnapState } from './types';
 
 const DEFAULT_STATE: SnapState = {
-  workflows: [],
   currentWorkflow: null,
+  savedWorkflows: [],
   preparedTx: null,
-  quote: null,
   userAddress: null,
   userEns: null,
+  userNamehash: null,
   preferences: {
     slippage: 0.5,
     defaultChain: 1,
@@ -55,6 +55,12 @@ export async function setState(
 ): Promise<SnapState> {
   const current = await getState();
   return writeState(current, partial);
+}
+
+/** Invalidate cache and re-read from storage. 1 SES call. */
+export async function refreshState(): Promise<SnapState> {
+  cache = null;
+  return getState();
 }
 
 export async function clearState(): Promise<void> {

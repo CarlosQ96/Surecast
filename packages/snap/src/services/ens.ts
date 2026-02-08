@@ -77,6 +77,112 @@ export function encodeSetText(node: string, key: string, value: string): string 
 }
 
 // ============================================================
+// ENS: READ TEXT RECORD (raw fetch — no keccak needed)
+// ============================================================
+
+const ETH_RPC = 'https://ethereum-rpc.publicnode.com';
+const ENS_REGISTRY = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e';
+
+/** ABI-encode a dynamic string: length word + padded UTF-8 data. */
+function encodeStringParam(str: string): string {
+  const hex = toHex(str);
+  const lengthWord = encodeUint256(str.length);
+  const paddedData = padRight(hex, Math.ceil(str.length / 32) * 32 || 32);
+  return lengthWord + paddedData;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
+  const bytes = new Uint8Array(h.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+/** Decode an ABI-encoded string from an eth_call hex result. */
+function decodeString(hex: string): string | null {
+  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (h.length < 128) return null;
+
+  const offset = parseInt(h.slice(0, 64), 16) * 2;
+  const length = parseInt(h.slice(offset, offset + 64), 16);
+  if (length === 0) return null;
+
+  const dataHex = h.slice(offset + 64, offset + 64 + length * 2);
+  const bytes = hexToBytes(dataHex);
+  let result = '';
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i] as number);
+  }
+  return result;
+}
+
+async function ethCall(to: string, data: string): Promise<string> {
+  const response = await fetch(ETH_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_call',
+      params: [{ to, data }, 'latest'],
+    }),
+  });
+  const text = await response.text();
+  if (text.startsWith('<')) {
+    throw new Error('RPC returned HTML — likely rate-limited');
+  }
+  const json = JSON.parse(text);
+  if (json.error) throw new Error(json.error.message);
+  return json.result;
+}
+
+/** Build calldata for text(bytes32 node, string key). Selector: 0x59d1d43c */
+function buildTextCalldata(nodeHex: string, key: string): string {
+  const keyOffset = encodeUint256(64);
+  const encodedKey = encodeStringParam(key);
+  return '0x59d1d43c' + nodeHex + keyOffset + encodedKey;
+}
+
+async function callText(resolver: string, nodeHex: string, key: string): Promise<string | null> {
+  const result = await ethCall(resolver, buildTextCalldata(nodeHex, key));
+  if (!result || result === '0x') return null;
+  return decodeString(result);
+}
+
+/**
+ * Read a text record from ENS using a pre-computed namehash.
+ * Tries the name's own resolver first, falls back to Public Resolver.
+ */
+export async function readEnsText(namehash: string, key: string): Promise<string | null> {
+  const nodeHex = namehash.startsWith('0x') ? namehash.slice(2) : namehash;
+
+  // Get the name's resolver from ENS Registry
+  const resolverCalldata = '0x0178b8bf' + nodeHex;
+  const resolverResult = await ethCall(ENS_REGISTRY, resolverCalldata);
+
+  const hasResolver =
+    resolverResult &&
+    resolverResult !== '0x' &&
+    resolverResult !== '0x' + '0'.repeat(64);
+
+  if (hasResolver) {
+    const resolverAddress = '0x' + resolverResult.slice(26);
+    const value = await callText(resolverAddress, nodeHex, key);
+    if (value) return value;
+
+    // If already Public Resolver, no need to retry
+    if (resolverAddress.toLowerCase() === ENS_PUBLIC_RESOLVER.toLowerCase()) {
+      return null;
+    }
+  }
+
+  // Fall back to Public Resolver
+  return callText(ENS_PUBLIC_RESOLVER, nodeHex, key);
+}
+
+// ============================================================
 // WORKFLOW SERIALIZATION
 // ============================================================
 

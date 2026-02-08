@@ -15,12 +15,10 @@ import {
 } from '../hooks';
 import { isLocalSnap, shouldDisplayReconnectButton } from '../utils';
 import {
-  readEnsText,
   lookupEnsName,
   computeNamehash,
   slugify,
   getWorkflowKey,
-  ENS_WORKFLOW_KEY_LEGACY,
 } from '../utils/ens';
 
 // ============================================================
@@ -89,6 +87,29 @@ interface FullWorkflow {
   id: string;
   name: string;
   steps: WorkflowStep[];
+}
+
+// ============================================================
+// LOCAL STORAGE PERSISTENCE
+// ============================================================
+
+const LOCAL_STORAGE_KEY = 'surecast-workflow';
+
+function saveToLocal(workflowData: FullWorkflow): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(workflowData));
+  } catch {
+    // localStorage may be full or unavailable
+  }
+}
+
+function loadFromLocal(): FullWorkflow | null {
+  try {
+    const json = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return json ? (JSON.parse(json) as FullWorkflow) : null;
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================
@@ -403,6 +424,7 @@ const Index = () => {
   const requestSnap = useRequestSnap();
   const invokeSnap = useInvokeSnap();
   const [workflowInfo, setWorkflowInfo] = useState<WorkflowInfo>(null);
+  const [savedCount, setSavedCount] = useState(0);
 
   // Executor state
   const [execStatus, setExecStatus] = useState<ExecutorStatus>('idle');
@@ -416,8 +438,8 @@ const Index = () => {
   const [ensTxHash, setEnsTxHash] = useState<string | null>(null);
   const [loadEnsInput, setLoadEnsInput] = useState('');
   const [loadEnsSlug, setLoadEnsSlug] = useState('');
-  const [savedWorkflows, setSavedWorkflows] = useState<FullWorkflow[]>([]);
   const [ensSlugPreview, setEnsSlugPreview] = useState<string | null>(null);
+  const [pendingEnsTx, setPendingEnsTx] = useState<PreparedTransaction | null>(null);
 
   // Ref to allow cancellation of in-progress execution
   const cancelledRef = useRef(false);
@@ -434,26 +456,40 @@ const Index = () => {
     })) as string[] | null;
 
     if (accounts?.[0]) {
-      // Set address in snap
-      await invokeSnap({
-        method: 'setUserAddress',
-        params: { address: accounts[0] },
-      });
-
-      // Reverse lookup via viem (more reliable than ensideas.com API)
+      // Reverse lookup for ENS name
+      let ens: string | null = null;
       try {
-        const ens = await lookupEnsName(accounts[0]);
-        if (ens) {
-          setEnsName(ens);
-        }
+        ens = await lookupEnsName(accounts[0]);
+        if (ens) setEnsName(ens);
       } catch {
         // ENS reverse lookup is best-effort
       }
+
+      // Set address + namehash in snap (namehash needed for ENS save from snap)
+      await invokeSnap({
+        method: 'setUserAddress',
+        params: {
+          address: accounts[0],
+          ...(ens ? { namehash: computeNamehash(ens) } : {}),
+        },
+      });
     }
 
-    const currentWorkflow = (await invokeSnap({
+    let currentWorkflow = (await invokeSnap({
       method: 'getCurrentWorkflow',
-    })) as { name: string; steps: unknown[] } | null;
+    })) as FullWorkflow | null;
+
+    // If snap has no workflow, try restoring from localStorage
+    if (!currentWorkflow) {
+      const localWorkflow = loadFromLocal();
+      if (localWorkflow && localWorkflow.steps.length > 0) {
+        await invokeSnap({
+          method: 'importWorkflow',
+          params: { workflowJson: JSON.stringify(localWorkflow) },
+        });
+        currentWorkflow = localWorkflow;
+      }
+    }
 
     if (currentWorkflow) {
       setWorkflowInfo({
@@ -461,13 +497,31 @@ const Index = () => {
         stepCount: currentWorkflow.steps?.length ?? 0,
       });
       setEnsSlugPreview(slugify(currentWorkflow.name));
+      saveToLocal(currentWorkflow);
     }
 
-    // Fetch all saved workflows for ENS picker
-    const allWorkflows = (await invokeSnap({
-      method: 'getWorkflows',
-    })) as FullWorkflow[] | null;
-    setSavedWorkflows(allWorkflows ?? []);
+    // Fetch saved workflow count
+    try {
+      const saved = (await invokeSnap({
+        method: 'getSavedWorkflows',
+      })) as unknown[] | null;
+      setSavedCount(saved?.length ?? 0);
+    } catch {
+      // best-effort
+    }
+
+    // Check for pending ENS save (prepared from snap UI)
+    try {
+      const pendingTx = (await invokeSnap({
+        method: 'getPreparedTransaction',
+      })) as PreparedTransaction | null;
+      if (pendingTx && (pendingTx as PreparedTransaction & { type?: string }).type === 'ens-write') {
+        setPendingEnsTx(pendingTx);
+        setEnsStatus(pendingTx.description ?? 'Pending ENS save — confirm below.');
+      }
+    } catch {
+      // best-effort
+    }
   }, [installedSnap, invokeSnap, provider]);
 
   useEffect(() => {
@@ -852,47 +906,85 @@ const Index = () => {
   }, [provider, ensName, invokeSnap, switchChain]);
 
   // ============================================================
+  // ENS: CONFIRM PENDING ENS SAVE (prepared from snap UI)
+  // ============================================================
+
+  const confirmPendingEnsTx = useCallback(async () => {
+    if (!provider || !pendingEnsTx) return;
+
+    setEnsStatus('Switching to Ethereum mainnet...');
+    setEnsTxHash(null);
+
+    try {
+      const accounts = (await provider.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
+      if (!accounts?.[0]) {
+        setEnsStatus('No wallet accounts found.');
+        return;
+      }
+
+      await switchChain(1);
+
+      setEnsStatus('Confirm setText transaction in MetaMask...');
+      const hash = (await provider.request({
+        method: 'eth_sendTransaction',
+        params: [
+          {
+            from: accounts[0],
+            to: pendingEnsTx.to,
+            value: pendingEnsTx.value,
+            data: pendingEnsTx.data,
+          },
+        ],
+      })) as string;
+
+      await invokeSnap({ method: 'clearPreparedTransaction' });
+      setPendingEnsTx(null);
+      setEnsTxHash(hash);
+      setEnsStatus('Saved to ENS!');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEnsStatus(`ENS save failed: ${msg}`);
+    }
+  }, [provider, pendingEnsTx, invokeSnap, switchChain]);
+
+  // ============================================================
   // ENS: LOAD WORKFLOW FROM ENS
   // ============================================================
 
   const loadFromEns = useCallback(async (ensOwner: string, workflowSlug: string) => {
     if (!ensOwner) return;
 
-    const ensKey = workflowSlug
-      ? getWorkflowKey(workflowSlug)
-      : ENS_WORKFLOW_KEY_LEGACY;
-
-    setEnsStatus(`Loading "${ensKey}" from ${ensOwner}...`);
+    setEnsStatus(`Loading from ${ensOwner}...`);
     setEnsTxHash(null);
 
     try {
-      // Try slug-based key first
-      let workflowJson = await readEnsText(ensOwner, ensKey);
+      // Compute namehash on site (snap can't use keccak256 in SES)
+      const namehash = computeNamehash(ensOwner);
 
-      // Fallback to legacy key if slug-based not found and slug was provided
-      if (!workflowJson && workflowSlug) {
-        workflowJson = await readEnsText(ensOwner, ENS_WORKFLOW_KEY_LEGACY);
-      }
+      // Single RPC call: snap fetches ENS, deserializes, sets as current
+      const imported = (await invokeSnap({
+        method: 'loadFromEns',
+        params: {
+          namehash,
+          ...(workflowSlug ? { slug: workflowSlug } : {}),
+        },
+      })) as FullWorkflow;
 
-      if (!workflowJson) {
-        setEnsStatus(`No workflow found on ${ensOwner} (key: ${ensKey}).`);
-        return;
-      }
-
-      // Import into snap
-      await invokeSnap({
-        method: 'importWorkflow',
-        params: { workflowJson },
+      // Update local state directly — no syncWithSnap round-trip needed
+      setWorkflowInfo({
+        name: imported.name,
+        stepCount: imported.steps?.length ?? 0,
       });
-
-      // Refresh UI
-      await syncWithSnap();
+      setEnsSlugPreview(slugify(imported.name));
+      saveToLocal(imported);
       setEnsStatus(`Loaded workflow from ${ensOwner}!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setEnsStatus(`ENS load failed: ${msg}`);
     }
-  }, [invokeSnap, syncWithSnap]);
+  }, [invokeSnap]);
 
   // ============================================================
   // RESET
@@ -981,6 +1073,11 @@ const Index = () => {
             <p style={txDescriptionStyle}>
               {workflowInfo.stepCount} step{workflowInfo.stepCount === 1 ? '' : 's'} — Open the Surecast home in MetaMask to edit.
             </p>
+            {savedCount > 0 && (
+              <p style={{ ...txDescriptionStyle, fontSize: '0.85rem' }}>
+                {savedCount} saved workflow{savedCount === 1 ? '' : 's'} in snap
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -1083,6 +1180,37 @@ const Index = () => {
         }}>
           <h3 style={sectionTitleStyle}>ENS Workflow Sharing</h3>
 
+          {pendingEnsTx && (
+            <div style={{
+              backgroundColor: COLORS.warningBg,
+              border: `1px solid ${COLORS.primary}`,
+              borderRadius: '4px',
+              padding: '1rem',
+              marginBottom: '1rem',
+              textAlign: 'left',
+            }}>
+              <p style={{ ...statusMessageStyle, fontWeight: 600, margin: 0 }}>
+                {pendingEnsTx.description ?? 'Pending ENS save'}
+              </p>
+              <button
+                style={{ ...primaryButtonStyle, marginTop: '0.5rem' }}
+                onClick={confirmPendingEnsTx}
+              >
+                Confirm ENS Save
+              </button>
+              <button
+                style={{ ...retryButtonStyle, marginLeft: '0.5rem', marginTop: '0.5rem' }}
+                onClick={async () => {
+                  await invokeSnap({ method: 'clearPreparedTransaction' });
+                  setPendingEnsTx(null);
+                  setEnsStatus('');
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {ensName ? (
             <p style={txDescriptionStyle}>
               Your ENS: <strong>{ensName}</strong>
@@ -1109,37 +1237,6 @@ const Index = () => {
               >
                 Save Current Workflow to ENS
               </button>
-            </div>
-          )}
-
-          {ensName && savedWorkflows.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
-              <p style={txDescriptionStyle}>Or save a different workflow:</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
-                {savedWorkflows.map((savedWorkflow) => (
-                  <button
-                    key={savedWorkflow.id}
-                    style={{
-                      ...primaryButtonStyle,
-                      marginTop: 0,
-                      fontSize: '0.9rem',
-                      padding: '0.5rem 1rem',
-                      backgroundColor: COLORS.grayDark,
-                    }}
-                    onClick={async () => {
-                      // Load this workflow as current, then save
-                      await invokeSnap({
-                        method: 'loadWorkflow',
-                        params: { workflowId: savedWorkflow.id },
-                      });
-                      await syncWithSnap();
-                      await saveToEns(slugify(savedWorkflow.name));
-                    }}
-                  >
-                    {`${savedWorkflow.name} (${savedWorkflow.steps.length} steps)`}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 

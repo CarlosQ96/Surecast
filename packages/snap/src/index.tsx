@@ -15,18 +15,11 @@ import {
   Banner,
 } from '@metamask/snaps-sdk/jsx';
 
-import { getState, setState, writeState } from './state';
+import { getState, setState, writeState, refreshState } from './state';
 /* setState only used by onInstall; getState returns from cache after first call */
 import { generateId } from './helpers';
-import { renderHome, renderSwapForm, updateUI } from './ui';
-import {
-  handleSwapSubmit,
-  handleGetQuote,
-  handleSaveWorkflow,
-  handleSubmitSave,
-  handleLoadWorkflow,
-  handleDeleteWorkflow,
-} from './handlers';
+import { renderHome, renderSwapForm, renderRenameForm, renderWorkflowList, updateUI } from './ui';
+import { handleSwapSubmit, handleGetQuote, handleRename, handleSaveToEns, handleSaveWorkflow, handleLoadSavedWorkflow, handleDeleteSavedWorkflow } from './handlers';
 
 export { onRpcRequest } from './rpc';
 
@@ -46,27 +39,27 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
       return;
     }
 
-    // 1) Read interface state once at top — gets all form values (1 SES call)
-    const interfaceState = await snap.request({
-      method: 'snap_getInterfaceState',
-      params: { id },
-    });
-    const formState = interfaceState as Record<string, Record<string, string>>;
-    const swapForm = formState?.['swap-form'] ?? {};
-    const saveForm = formState?.['save-form'] ?? {};
-
-    // 2) Read persistent state from cache (0 SES calls after first load)
+    // 1) Read persistent state from cache (0 SES calls after first load)
     const state = await getState();
+
+    // 2) Only read form state for submit buttons (saves 1 SES call on navigation)
+    const needsFormData = event.name === 'submit-swap' || event.name === 'submit-rename';
+    let swapForm: Record<string, string> = {};
+    let renameForm: Record<string, string> = {};
+    if (needsFormData) {
+      const interfaceState = await snap.request({
+        method: 'snap_getInterfaceState',
+        params: { id },
+      });
+      const formState = interfaceState as Record<string, Record<string, string>>;
+      swapForm = formState?.['swap-form'] ?? {};
+      renameForm = formState?.['rename-form'] ?? {};
+    }
 
     // 3) Route by button name — each case does 1-2 SES calls max
     switch (event.name) {
       case 'submit-swap': {
         await handleSwapSubmit(id, state, swapForm);
-        return;
-      }
-
-      case 'submit-save': {
-        await handleSubmitSave(id, state, saveForm);
         return;
       }
 
@@ -141,8 +134,34 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         return;
       }
 
+      case 'show-rename': {
+        const currentName = state.currentWorkflow?.name ?? 'Untitled Workflow';
+        await updateUI(id, renderRenameForm(currentName));
+        return;
+      }
+
+      case 'submit-rename': {
+        await handleRename(id, state, renameForm);
+        return;
+      }
+
+      case 'save-to-ens': {
+        await handleSaveToEns(id, state);
+        return;
+      }
+
       case 'get-quote': {
         await handleGetQuote(id, state);
+        return;
+      }
+
+      case 'save-workflow': {
+        await handleSaveWorkflow(id, state);
+        return;
+      }
+
+      case 'show-saved': {
+        await updateUI(id, renderWorkflowList(state));
         return;
       }
 
@@ -159,13 +178,9 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         return;
       }
 
-      case 'load-workflow': {
-        await handleLoadWorkflow(id, state);
-        return;
-      }
-
-      case 'save-workflow': {
-        await handleSaveWorkflow(id, state);
+      case 'refresh': {
+        const freshState = await refreshState();
+        await updateUI(id, renderHome(freshState));
         return;
       }
 
@@ -176,17 +191,7 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
 
       default: {
         const name = event.name ?? '';
-        if (name.startsWith('load-')) {
-          const workflowId = name.replace('load-', '');
-          const target = state.workflows.find((workflow) => workflow.id === workflowId);
-          if (target) {
-            const loadedState = await writeState(state, { currentWorkflow: target });
-            await updateUI(id, renderHome(loadedState));
-          }
-        } else if (name.startsWith('delete-workflow-')) {
-          const workflowId = name.replace('delete-workflow-', '');
-          await handleDeleteWorkflow(id, workflowId, state);
-        } else if (name.startsWith('delete-step-')) {
+        if (name.startsWith('delete-step-')) {
           const stepId = name.replace('delete-step-', '');
           const currentWorkflow = state.currentWorkflow;
           if (currentWorkflow) {
@@ -195,6 +200,12 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
             const updatedState = await writeState(state, { currentWorkflow: updatedWorkflow });
             await updateUI(id, renderHome(updatedState));
           }
+        } else if (name.startsWith('load-saved-')) {
+          const workflowId = name.replace('load-saved-', '');
+          await handleLoadSavedWorkflow(id, state, workflowId);
+        } else if (name.startsWith('delete-saved-')) {
+          const workflowId = name.replace('delete-saved-', '');
+          await handleDeleteSavedWorkflow(id, state, workflowId);
         }
         break;
       }

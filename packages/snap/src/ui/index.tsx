@@ -7,7 +7,6 @@ import {
   Section,
   Card,
   Icon,
-  Banner,
   Form,
   Field,
   Input,
@@ -22,12 +21,15 @@ import type { SnapState } from '../types';
 export function renderHome(state: SnapState) {
   const workflow = state.currentWorkflow;
   const steps = workflow?.steps ?? [];
+  const savedCount = state.savedWorkflows?.length ?? 0;
 
   return (
     <Box>
       <Box direction="horizontal" alignment="space-between">
         <Heading size="lg">Surecast</Heading>
-        <Icon name="flash" color="primary" />
+        <Button name="refresh" size="sm">
+          <Icon name="refresh" size="inherit" />
+        </Button>
       </Box>
       <Text color="muted">DeFi workflow composer</Text>
       {state.userEns ? (
@@ -40,10 +42,13 @@ export function renderHome(state: SnapState) {
         <Section>
           <Box direction="horizontal" alignment="space-between">
             <Text fontWeight="bold">{workflow.name}</Text>
-            <Text color="muted" size="sm">
-              {`${steps.length} step${steps.length === 1 ? '' : 's'}`}
-            </Text>
+            <Button name="show-rename" size="sm">
+              <Icon name="edit" size="inherit" />
+            </Button>
           </Box>
+          <Text color="muted" size="sm">
+            {`${steps.length} step${steps.length === 1 ? '' : 's'}`}
+          </Text>
           {steps.length === 0 ? (
             <Text color="muted">No steps yet. Add one below.</Text>
           ) : null}
@@ -99,28 +104,34 @@ export function renderHome(state: SnapState) {
             {' Get Quote'}
           </Button>
         ) : null}
-        {steps.length > 0 ? (
+        {workflow && steps.length > 0 ? (
           <Button name="save-workflow">
-            <Icon name="save" size="inherit" />
+            <Icon name="export" size="inherit" />
             {' Save Workflow'}
-          </Button>
-        ) : null}
-        {(state.workflows?.length ?? 0) > 0 ? (
-          <Button name="load-workflow">
-            <Icon name="download" size="inherit" />
-            {' Load Saved'}
           </Button>
         ) : null}
         <Button name="new-workflow">
           <Icon name="add" size="inherit" />
           {' New Workflow'}
         </Button>
+        <Button name="show-saved">
+          <Icon name="menu" size="inherit" />
+          {` My Workflows (${savedCount})`}
+        </Button>
       </Section>
 
-      {state.userEns && steps.length > 0 ? (
-        <Banner title="ENS" severity="info">
-          <Text>Open executor page to save to ENS.</Text>
-        </Banner>
+      {steps.length > 0 ? (
+        <Section>
+          {state.userEns ? (
+            <Text color="muted" size="sm">{`ENS: ${state.userEns}`}</Text>
+          ) : (
+            <Text color="muted" size="sm">Open the Surecast site to connect your ENS name.</Text>
+          )}
+          <Button name="save-to-ens" variant="primary">
+            <Icon name="export" size="inherit" />
+            {' Save to ENS'}
+          </Button>
+        </Section>
       ) : null}
     </Box>
   );
@@ -199,42 +210,75 @@ export function renderSwapForm(existingStepCount: number) {
   );
 }
 
-export function renderSavedWorkflows(
-  workflows: SnapState['workflows'],
-  banner?: { title: string; text: string },
-) {
+export function renderRenameForm(currentName: string) {
   return (
     <Box>
       <Box direction="horizontal" alignment="space-between">
-        <Heading>Saved Workflows</Heading>
-        <Icon name="download" color="primary" />
+        <Heading>Rename Workflow</Heading>
+        <Icon name="edit" color="primary" />
       </Box>
-      {banner ? (
-        <Banner title={banner.title} severity="success">
-          <Text>{banner.text}</Text>
-        </Banner>
-      ) : null}
-      <Text color="muted" size="sm">
-        {`${workflows.length} workflow${workflows.length === 1 ? '' : 's'} saved`}
-      </Text>
       <Divider />
-      <Section>
-        {workflows.map((w) => (
-          <Box>
-            <Button name={`load-${w.id}`}>
-              {`${w.name} (${w.steps.length} steps)`}
-            </Button>
-            <Button
-              name={`delete-workflow-${w.id}`}
-              variant="destructive"
-              size="sm"
-            >
-              <Icon name="trash" size="inherit" />
-              {' Delete'}
-            </Button>
-          </Box>
-        ))}
-      </Section>
+      <Form name="rename-form">
+        <Field label="Workflow Name">
+          <Input name="workflowName" placeholder={currentName} />
+        </Field>
+      </Form>
+      <Button name="submit-rename" variant="primary">
+        <Icon name="confirmation" size="inherit" />
+        {' Save Name'}
+      </Button>
+      <Button name="back-home">
+        <Icon name="arrow-left" size="inherit" />
+        {' Cancel'}
+      </Button>
+    </Box>
+  );
+}
+
+export function renderWorkflowList(state: SnapState) {
+  const saved = state.savedWorkflows ?? [];
+
+  return (
+    <Box>
+      <Box direction="horizontal" alignment="space-between">
+        <Heading>My Workflows</Heading>
+        <Icon name="menu" color="primary" />
+      </Box>
+      <Text color="muted" size="sm">{`${saved.length} saved workflow${saved.length === 1 ? '' : 's'}`}</Text>
+      <Divider />
+
+      {saved.length === 0 ? (
+        <Section>
+          <Text color="muted">No saved workflows yet. Save your current workflow from the home screen.</Text>
+        </Section>
+      ) : null}
+
+      {saved.map((workflow) => {
+        const stepCount = workflow.steps?.length ?? 0;
+        const date = new Date(workflow.updatedAt).toLocaleDateString();
+
+        return (
+          <Section>
+            <Card
+              title={workflow.name}
+              description={`${stepCount} step${stepCount === 1 ? '' : 's'} — updated ${date}`}
+              value={workflow.steps.map((step) => step.type.toUpperCase()).join(' → ')}
+              extra={workflow.id}
+            />
+            <Box direction="horizontal">
+              <Button name={`load-saved-${workflow.id}`} variant="primary" size="sm">
+                <Icon name="download" size="inherit" />
+                {' Load'}
+              </Button>
+              <Button name={`delete-saved-${workflow.id}`} variant="destructive" size="sm">
+                <Icon name="trash" size="inherit" />
+                {' Delete'}
+              </Button>
+            </Box>
+          </Section>
+        );
+      })}
+
       <Divider />
       <Button name="back-home">
         <Icon name="arrow-left" size="inherit" />

@@ -3,7 +3,7 @@
   "description": "Surecast - DeFi Lifi Composer with ENS text records persistence snap for MetaMask",
   "proposedName": "Surecast",
   "source": {
-    "shasum": "mV2vXV8NfyvoQKMzHbCdPHieGCeflwRA4NFD3mIuk84=",
+    "shasum": "vagB4TLbiOwoLAiraT5py8xtRsFnYaSOEXSQaQE1ovY=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",

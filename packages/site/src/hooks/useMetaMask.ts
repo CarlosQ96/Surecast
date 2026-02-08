@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useMetaMaskContext } from './MetamaskContext';
 import { useRequest } from './useRequest';
@@ -21,7 +21,7 @@ export const useMetaMask = () => {
   /**
    * Detect if the version of MetaMask is Flask.
    */
-  const detectFlask = async () => {
+  const detectFlask = useCallback(async () => {
     const clientVersion = await request({
       method: 'web3_clientVersion',
     });
@@ -29,18 +29,18 @@ export const useMetaMask = () => {
     const isFlaskDetected = (clientVersion as string[])?.includes('flask');
 
     setIsFlask(isFlaskDetected);
-  };
+  }, [request]);
 
   /**
    * Get the Snap informations from MetaMask.
    */
-  const getSnap = async () => {
+  const getSnap = useCallback(async () => {
     const snaps = (await request({
       method: 'wallet_getSnaps',
     })) as GetSnapsResponse;
 
     setInstalledSnap(snaps[defaultSnapOrigin] ?? null);
-  };
+  }, [request, setInstalledSnap]);
 
   useEffect(() => {
     const detect = async () => {
@@ -51,7 +51,7 @@ export const useMetaMask = () => {
     };
 
     detect().catch(console.error);
-  }, [provider]);
+  }, [provider, detectFlask, getSnap]);
 
   return { isFlask, snapsDetected, installedSnap, getSnap };
 };

@@ -9,19 +9,22 @@ import {
   Icon,
   Banner,
   Spinner,
-  Form,
-  Field,
-  Input,
 } from '@metamask/snaps-sdk/jsx';
-/* Form/Field/Input still used by handleSaveWorkflow UI */
 
 import { CHAINS, CHAIN_NAMES } from '../data/chains';
 import { TOKENS } from '../data/tokens';
 import { getSwapQuote, formatTokenAmount } from '../services/lifi';
 import { writeState } from '../state';
+import {
+  ENS_PUBLIC_RESOLVER,
+  encodeSetText,
+  serializeWorkflow,
+  slugify,
+  getWorkflowKey,
+} from '../services/ens';
 import type { SnapState, WorkflowStep } from '../types';
 import { generateId, chainNameToId, parseAmount } from '../helpers';
-import { renderHome, renderSavedWorkflows, updateUI } from '../ui';
+import { renderHome, renderWorkflowList, updateUI } from '../ui';
 
 export async function handleSwapSubmit(
   id: string,
@@ -35,7 +38,6 @@ export async function handleSwapSubmit(
   const humanAmount = (formValues.amount ?? '').trim();
   const useAll = (formValues.useAllFromPrevious ?? 'No') === 'Yes';
 
-  // Validate amount (skip if chaining from previous step)
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
     await updateUI(id, (
       <Box>
@@ -55,7 +57,6 @@ export async function handleSwapSubmit(
     return;
   }
 
-  // Validate same token on same chain (LI.FI error 1011)
   if (fromChain === toChain && fromSymbol === toSymbol) {
     await updateUI(id, (
       <Box>
@@ -75,7 +76,6 @@ export async function handleSwapSubmit(
     return;
   }
 
-  // Validate tokens exist on selected chains
   const fromTokenInfo = TOKENS[fromChain]?.[fromSymbol];
   const toTokenInfo = TOKENS[toChain]?.[toSymbol];
   if (!fromTokenInfo) {
@@ -184,7 +184,6 @@ export async function handleGetQuote(id: string, state: SnapState) {
     return;
   }
 
-  // Find first quotable step (one with a fixed amount, not chained)
   const firstStep = workflow.steps[0];
   if (!firstStep || firstStep.type !== 'swap') {
     await updateUI(id, (
@@ -254,12 +253,8 @@ export async function handleGetQuote(id: string, state: SnapState) {
     const estOutput = formatTokenAmount(quote.toAmount, quote.toDecimals);
     const minOutput = formatTokenAmount(quote.toAmountMin, quote.toDecimals);
 
-    // For single-step workflows, also store prepared tx for backward compat
     if (workflow.steps.length === 1) {
-      await writeState(state, {
-        quote: { raw: JSON.stringify(quote) },
-        preparedTx: quote.tx,
-      });
+      await writeState(state, { preparedTx: quote.tx });
     }
 
     const isMultiStep = workflow.steps.length > 1;
@@ -319,46 +314,131 @@ export async function handleGetQuote(id: string, state: SnapState) {
   }
 }
 
+export async function handleRename(
+  id: string,
+  state: SnapState,
+  formValues: Record<string, string>,
+) {
+  const newName = (formValues.workflowName ?? '').trim();
+  if (!newName) {
+    await updateUI(id, renderHome(state));
+    return;
+  }
+
+  const workflow = state.currentWorkflow;
+  if (!workflow) {
+    await updateUI(id, renderHome(state));
+    return;
+  }
+
+  const updated = { ...workflow, name: newName, updatedAt: Date.now() };
+  const newState = await writeState(state, { currentWorkflow: updated });
+  await updateUI(id, renderHome(newState));
+}
+
 export async function handleSaveWorkflow(id: string, state: SnapState) {
   const workflow = state.currentWorkflow;
-  const existingSave = state.workflows.find((w) => w.id === workflow?.id);
+  if (!workflow || workflow.steps.length === 0) {
+    await updateUI(id, (
+      <Box>
+        <Banner title="Nothing to Save" severity="warning">
+          <Text>Add at least one step before saving.</Text>
+        </Banner>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back'}
+        </Button>
+      </Box>
+    ));
+    return;
+  }
+
+  const saved = state.savedWorkflows ?? [];
+  const existingIndex = saved.findIndex((item) => item.name === workflow.name);
+
+  const copy = {
+    ...workflow,
+    id: existingIndex >= 0 ? saved[existingIndex]!.id : generateId(),
+    updatedAt: Date.now(),
+  };
+
+  const updatedSaved = existingIndex >= 0
+    ? saved.map((item, index) => (index === existingIndex ? copy : item))
+    : [...saved, copy];
+
+  await writeState(state, { savedWorkflows: updatedSaved });
+  const action = existingIndex >= 0 ? 'Updated' : 'Saved';
+
   await updateUI(id, (
     <Box>
-      <Box direction="horizontal" alignment="space-between">
-        <Heading>Save Workflow</Heading>
-        <Icon name="save" color="primary" />
-      </Box>
-      {existingSave ? (
-        <Text color="muted" size="sm">{`Updating "${existingSave.name}"`}</Text>
-      ) : null}
-      <Divider />
-      <Form name="save-form">
-        <Field label="Workflow Name">
-          <Input name="workflowName" value={workflow?.name ?? 'My Workflow'} placeholder="My Workflow" />
-        </Field>
-      </Form>
-      <Button name="submit-save" variant="primary">
-        <Icon name="save" size="inherit" />
-        {existingSave ? ' Update' : ' Save'}
-      </Button>
-      <Divider />
-      <Button name="back-home">
-        <Icon name="arrow-left" size="inherit" />
-        {' Cancel'}
-      </Button>
+      <Banner title={`${action}!`} severity="success">
+        <Text>{`${action} "${workflow.name}" (${updatedSaved.length} workflow${updatedSaved.length === 1 ? '' : 's'} saved)`}</Text>
+      </Banner>
+      <Section>
+        <Button name="show-saved">
+          <Icon name="menu" size="inherit" />
+          {' View My Workflows'}
+        </Button>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back to Home'}
+        </Button>
+      </Section>
     </Box>
   ));
 }
 
-export async function handleSubmitSave(id: string, state: SnapState, formValues: Record<string, string>) {
-  const saveName = (formValues.workflowName ?? '').trim() || 'Untitled Workflow';
+export async function handleLoadSavedWorkflow(
+  id: string,
+  state: SnapState,
+  workflowId: string,
+) {
+  const saved = state.savedWorkflows ?? [];
+  const target = saved.find((item) => item.id === workflowId);
 
-  const currentWorkflow = state.currentWorkflow;
-  if (!currentWorkflow) {
+  if (!target) {
     await updateUI(id, (
       <Box>
-        <Banner title="No Workflow" severity="warning">
-          <Text>No active workflow to save.</Text>
+        <Banner title="Not Found" severity="danger">
+          <Text>Workflow not found in saved list.</Text>
+        </Banner>
+        <Button name="show-saved">
+          <Icon name="arrow-left" size="inherit" />
+          {' Back to List'}
+        </Button>
+      </Box>
+    ));
+    return;
+  }
+
+  const loaded = {
+    ...target,
+    id: generateId(),
+    updatedAt: Date.now(),
+  };
+
+  const newState = await writeState(state, { currentWorkflow: loaded });
+  await updateUI(id, renderHome(newState));
+}
+
+export async function handleDeleteSavedWorkflow(
+  id: string,
+  state: SnapState,
+  workflowId: string,
+) {
+  const saved = state.savedWorkflows ?? [];
+  const filtered = saved.filter((item) => item.id !== workflowId);
+  const newState = await writeState(state, { savedWorkflows: filtered });
+  await updateUI(id, renderWorkflowList(newState));
+}
+
+export async function handleSaveToEns(id: string, state: SnapState) {
+  const workflow = state.currentWorkflow;
+  if (!workflow || workflow.steps.length === 0) {
+    await updateUI(id, (
+      <Box>
+        <Banner title="No Steps" severity="warning">
+          <Text>Add at least one step before saving to ENS.</Text>
         </Banner>
         <Button name="back-home">
           <Icon name="home" size="inherit" />
@@ -369,26 +449,11 @@ export async function handleSubmitSave(id: string, state: SnapState, formValues:
     return;
   }
 
-  const savedWorkflow = { ...currentWorkflow, name: saveName, updatedAt: Date.now() };
-  const workflows = [...state.workflows];
-  const existingIndex = workflows.findIndex((workflow) => workflow.id === savedWorkflow.id);
-  if (existingIndex >= 0) {
-    workflows[existingIndex] = savedWorkflow;
-  } else {
-    workflows.push(savedWorkflow);
-  }
-
-  const updatedState = await writeState(state, { currentWorkflow: savedWorkflow, workflows });
-  await updateUI(id, renderHome(updatedState));
-}
-
-export async function handleLoadWorkflow(id: string, state: SnapState) {
-  const saved = state.workflows;
-  if (saved.length === 0) {
+  if (!state.userNamehash || !state.userEns) {
     await updateUI(id, (
       <Box>
-        <Banner title="No Saved Workflows" severity="warning">
-          <Text>You haven't saved any workflows yet.</Text>
+        <Banner title="No ENS" severity="warning">
+          <Text>Connect a wallet with an ENS name on the Surecast site first.</Text>
         </Banner>
         <Button name="back-home">
           <Icon name="home" size="inherit" />
@@ -398,24 +463,34 @@ export async function handleLoadWorkflow(id: string, state: SnapState) {
     ));
     return;
   }
-  await updateUI(id, renderSavedWorkflows(saved));
-}
 
-export async function handleDeleteWorkflow(id: string, workflowId: string, state: SnapState) {
-  const filtered = state.workflows.filter((w) => w.id !== workflowId);
-  const isCurrent = state.currentWorkflow?.id === workflowId;
+  const workflowSlug = slugify(workflow.name);
+  const ensKey = getWorkflowKey(workflowSlug);
+  const serialized = serializeWorkflow(workflow);
+  const callData = encodeSetText(state.userNamehash, ensKey, serialized);
 
-  const updatedState = await writeState(state, {
-    workflows: filtered,
-    ...(isCurrent ? { currentWorkflow: null } : {}),
+  await writeState(state, {
+    preparedTx: {
+      to: ENS_PUBLIC_RESOLVER,
+      data: callData,
+      value: '0x0',
+      chainId: 1,
+      type: 'ens-write',
+      description: `Save "${workflow.name}" to ENS (${ensKey})`,
+    },
   });
 
-  if (filtered.length > 0) {
-    await updateUI(id, renderSavedWorkflows(filtered, {
-      title: 'Deleted',
-      text: 'Workflow removed.',
-    }));
-  } else {
-    await updateUI(id, renderHome(updatedState));
-  }
+  await updateUI(id, (
+    <Box>
+      <Banner title="ENS Save Prepared" severity="success">
+        <Text>{`Ready to save "${workflow.name}" to ${state.userEns}`}</Text>
+      </Banner>
+      <Text color="muted" size="sm">{`Key: ${ensKey}`}</Text>
+      <Text color="muted" size="sm">Open the Surecast site to confirm the transaction.</Text>
+      <Button name="back-home">
+        <Icon name="home" size="inherit" />
+        {' Back to Home'}
+      </Button>
+    </Box>
+  ));
 }
