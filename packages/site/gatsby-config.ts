@@ -11,10 +11,10 @@ const config: GatsbyConfig = {
       resolve: 'gatsby-plugin-manifest',
       options: {
         name: 'Surecast',
-        icon: 'src/assets/logo.svg',
+        icon: 'src/assets/surecast_logo.png',
         /* eslint-disable @typescript-eslint/naming-convention */
-        theme_color: '#6F4CFF',
-        background_color: '#FFFFFF',
+        theme_color: '#D63384',
+        background_color: '#F9F9FB',
         /* eslint-enable @typescript-eslint/naming-convention */
         display: 'standalone',
       },

@@ -9,6 +9,7 @@ import {
   Icon,
   Banner,
   Spinner,
+  Container,
 } from '@metamask/snaps-sdk/jsx';
 
 import { CHAINS, CHAIN_NAMES } from '../data/chains';
@@ -47,38 +48,42 @@ export async function handleSwapSubmit(
 
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Invalid Amount" severity="warning">
-          <Text>Please enter a valid positive number.</Text>
-        </Banner>
-        <Button name="step-swap" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Invalid Amount" severity="warning">
+            <Text>Please enter a valid positive number.</Text>
+          </Banner>
+          <Button name="step-swap" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
 
   if (fromChain === toChain && fromSymbol === toSymbol) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Invalid Swap" severity="danger">
-          <Text>Cannot swap a token to itself on the same chain. Choose a different destination token or chain.</Text>
-        </Banner>
-        <Button name="step-swap" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Invalid Swap" severity="danger">
+            <Text>Cannot swap a token to itself on the same chain. Choose a different destination token or chain.</Text>
+          </Banner>
+          <Button name="step-swap" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -87,37 +92,41 @@ export async function handleSwapSubmit(
   const toTokenInfo = TOKENS[toChain]?.[toSymbol];
   if (!fromTokenInfo) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Token Not Found" severity="danger">
-          <Text>{`${fromSymbol} is not available on ${CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
-        </Banner>
-        <Button name="step-swap" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Token Not Found" severity="danger">
+            <Text>{`${fromSymbol} is not available on ${CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
+          </Banner>
+          <Button name="step-swap" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
   if (!toTokenInfo) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Token Not Found" severity="danger">
-          <Text>{`${toSymbol} is not available on ${CHAIN_NAMES[toChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
-        </Banner>
-        <Button name="step-swap" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Token Not Found" severity="danger">
+            <Text>{`${toSymbol} is not available on ${CHAIN_NAMES[toChain as keyof typeof CHAIN_NAMES] ?? 'this chain'}.`}</Text>
+          </Banner>
+          <Button name="step-swap" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -152,21 +161,23 @@ export async function handleSwapSubmit(
 
   const amountLabel = useAll ? 'all from previous step' : `${humanAmount} ${fromSymbol}`;
   await updateUI(id, (
-    <Box>
-      <Banner title="Step Added" severity="success">
-        <Text>{`Swap ${amountLabel} → ${toSymbol}`}</Text>
-      </Banner>
-      <Section>
-        <Button name="add-step" variant="primary">
-          <Icon name="add" size="inherit" />
-          {' Add Another Step'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Workflow'}
-        </Button>
-      </Section>
-    </Box>
+    <Container>
+      <Box>
+        <Banner title="Step Added" severity="success">
+          <Text>{`Swap ${amountLabel} → ${toSymbol}`}</Text>
+        </Banner>
+        <Section>
+          <Button name="add-step" variant="primary">
+            <Icon name="add" size="inherit" />
+            {' Add Another Step'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Workflow'}
+          </Button>
+        </Section>
+      </Box>
+    </Container>
   ));
 }
 
@@ -174,19 +185,21 @@ export async function handleGetQuote(id: string, state: SnapState) {
   const workflow = state.currentWorkflow;
   if (!workflow || workflow.steps.length === 0) {
     await updateUI(id, (
-      <Box>
-        <Banner title="No Steps" severity="warning">
-          <Text>Add at least one step before getting a quote.</Text>
-        </Banner>
-        <Button name="add-step" variant="primary">
-          <Icon name="add" size="inherit" />
-          {' Add Step'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="No Steps" severity="warning">
+            <Text>Add at least one step before getting a quote.</Text>
+          </Banner>
+          <Button name="add-step" variant="primary">
+            <Icon name="add" size="inherit" />
+            {' Add Step'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -195,15 +208,17 @@ export async function handleGetQuote(id: string, state: SnapState) {
   const quotableTypes = ['swap', 'deposit', 'stake'];
   if (!firstStep || !quotableTypes.includes(firstStep.type)) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Not Supported Yet" severity="warning">
-          <Text>This step type cannot be quoted yet.</Text>
-        </Banner>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Not Supported Yet" severity="warning">
+            <Text>This step type cannot be quoted yet.</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -220,15 +235,17 @@ export async function handleGetQuote(id: string, state: SnapState) {
 
   if (!fromTokenInfo) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Token Error" severity="danger">
-          <Text>{`Cannot find ${fromSymbol} on chain ${fromChain}.`}</Text>
-        </Banner>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Token Error" severity="danger">
+            <Text>{`Cannot find ${fromSymbol} on chain ${fromChain}.`}</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -240,15 +257,17 @@ export async function handleGetQuote(id: string, state: SnapState) {
     const vaultToken = vaultTokens.find((vault) => vault.symbol === toSymbol);
     if (!vaultToken) {
       await updateUI(id, (
-        <Box>
-          <Banner title="Vault Token Error" severity="danger">
-            <Text>{`Cannot find vault token ${toSymbol} on chain ${toChain}.`}</Text>
-          </Banner>
-          <Button name="back-home">
-            <Icon name="home" size="inherit" />
-            {' Back'}
-          </Button>
-        </Box>
+        <Container>
+          <Box>
+            <Banner title="Vault Token Error" severity="danger">
+              <Text>{`Cannot find vault token ${toSymbol} on chain ${toChain}.`}</Text>
+            </Banner>
+            <Button name="back-home">
+              <Icon name="home" size="inherit" />
+              {' Back'}
+            </Button>
+          </Box>
+        </Container>
       ));
       return;
     }
@@ -258,14 +277,16 @@ export async function handleGetQuote(id: string, state: SnapState) {
   }
 
   await updateUI(id, (
-    <Box>
-      <Box direction="horizontal" alignment="space-between">
-        <Heading>Fetching Quote</Heading>
-        <Icon name="flash" color="primary" />
+    <Container>
+      <Box>
+        <Box direction="horizontal" alignment="space-between">
+          <Heading>Fetching Quote</Heading>
+          <Icon name="flash" color="primary" />
+        </Box>
+        <Spinner />
+        <Text color="muted">{`Step 1: ${humanAmount} ${fromSymbol} → ${toSymbol}`}</Text>
       </Box>
-      <Spinner />
-      <Text color="muted">{`Step 1: ${humanAmount} ${fromSymbol} → ${toSymbol}`}</Text>
-    </Box>
+    </Container>
   ));
 
   try {
@@ -292,56 +313,60 @@ export async function handleGetQuote(id: string, state: SnapState) {
     const isMultiStep = workflow.steps.length > 1;
 
     await updateUI(id, (
-      <Box>
-        <Box direction="horizontal" alignment="space-between">
-          <Heading>Quote Preview</Heading>
-          <Icon name="flash" color="primary" />
+      <Container>
+        <Box>
+          <Box direction="horizontal" alignment="space-between">
+            <Heading>Quote Preview</Heading>
+            <Icon name="flash" color="primary" />
+          </Box>
+          <Divider />
+          <Section>
+            <Text fontWeight="bold">{`${humanAmount} ${quote.fromSymbol} → ${quote.toSymbol}`}</Text>
+            <Row label="Estimated output">
+              <Text>{`${estOutput} ${quote.toSymbol}`}</Text>
+            </Row>
+            <Row label="Minimum output">
+              <Text>{`${minOutput} ${quote.toSymbol}`}</Text>
+            </Row>
+            <Row label="Gas cost">
+              <Text>{`~$${quote.gasUsd}`}</Text>
+            </Row>
+            <Row label="Estimated time">
+              <Text>{`~${quote.estimatedSeconds}s`}</Text>
+            </Row>
+          </Section>
+          {isMultiStep ? (
+            <Banner title="Multi-step Workflow" severity="info">
+              <Text>{`${workflow.steps.length} steps total. Fresh quotes fetched per step during execution.`}</Text>
+            </Banner>
+          ) : null}
+          <Divider />
+          <Text color="muted" size="sm">Open the Surecast executor page to run this workflow.</Text>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Home'}
+          </Button>
         </Box>
-        <Divider />
-        <Section>
-          <Text fontWeight="bold">{`${humanAmount} ${quote.fromSymbol} → ${quote.toSymbol}`}</Text>
-          <Row label="Estimated output">
-            <Text>{`${estOutput} ${quote.toSymbol}`}</Text>
-          </Row>
-          <Row label="Minimum output">
-            <Text>{`${minOutput} ${quote.toSymbol}`}</Text>
-          </Row>
-          <Row label="Gas cost">
-            <Text>{`~$${quote.gasUsd}`}</Text>
-          </Row>
-          <Row label="Estimated time">
-            <Text>{`~${quote.estimatedSeconds}s`}</Text>
-          </Row>
-        </Section>
-        {isMultiStep ? (
-          <Banner title="Multi-step Workflow" severity="info">
-            <Text>{`${workflow.steps.length} steps total. Fresh quotes fetched per step during execution.`}</Text>
-          </Banner>
-        ) : null}
-        <Divider />
-        <Text color="muted" size="sm">Open the Surecast executor page to run this workflow.</Text>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Home'}
-        </Button>
-      </Box>
+      </Container>
     ));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await updateUI(id, (
-      <Box>
-        <Banner title="Quote Failed" severity="danger">
-          <Text>{msg}</Text>
-        </Banner>
-        <Button name="get-quote" variant="primary">
-          <Icon name="flash" size="inherit" />
-          {' Retry'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Quote Failed" severity="danger">
+            <Text>{msg}</Text>
+          </Banner>
+          <Button name="get-quote" variant="primary">
+            <Icon name="flash" size="inherit" />
+            {' Retry'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
   }
 }
@@ -372,15 +397,17 @@ export async function handleSaveWorkflow(id: string, state: SnapState) {
   const workflow = state.currentWorkflow;
   if (!workflow || workflow.steps.length === 0) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Nothing to Save" severity="warning">
-          <Text>Add at least one step before saving.</Text>
-        </Banner>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Nothing to Save" severity="warning">
+            <Text>Add at least one step before saving.</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -402,21 +429,23 @@ export async function handleSaveWorkflow(id: string, state: SnapState) {
   const action = existingIndex >= 0 ? 'Updated' : 'Saved';
 
   await updateUI(id, (
-    <Box>
-      <Banner title={`${action}!`} severity="success">
-        <Text>{`${action} "${workflow.name}" (${updatedSaved.length} workflow${updatedSaved.length === 1 ? '' : 's'} saved)`}</Text>
-      </Banner>
-      <Section>
-        <Button name="show-saved">
-          <Icon name="menu" size="inherit" />
-          {' View My Workflows'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Home'}
-        </Button>
-      </Section>
-    </Box>
+    <Container>
+      <Box>
+        <Banner title={`${action}!`} severity="success">
+          <Text>{`${action} "${workflow.name}" (${updatedSaved.length} workflow${updatedSaved.length === 1 ? '' : 's'} saved)`}</Text>
+        </Banner>
+        <Section>
+          <Button name="show-saved">
+            <Icon name="menu" size="inherit" />
+            {' View My Workflows'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Home'}
+          </Button>
+        </Section>
+      </Box>
+    </Container>
   ));
 }
 
@@ -430,15 +459,17 @@ export async function handleLoadSavedWorkflow(
 
   if (!target) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Not Found" severity="danger">
-          <Text>Workflow not found in saved list.</Text>
-        </Banner>
-        <Button name="show-saved">
-          <Icon name="arrow-left" size="inherit" />
-          {' Back to List'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Not Found" severity="danger">
+            <Text>Workflow not found in saved list.</Text>
+          </Banner>
+          <Button name="show-saved">
+            <Icon name="arrow-left" size="inherit" />
+            {' Back to List'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -468,15 +499,17 @@ export async function handleSaveToEns(id: string, state: SnapState) {
   const workflow = state.currentWorkflow;
   if (!workflow || workflow.steps.length === 0) {
     await updateUI(id, (
-      <Box>
-        <Banner title="No Steps" severity="warning">
-          <Text>Add at least one step before saving to ENS.</Text>
-        </Banner>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="No Steps" severity="warning">
+            <Text>Add at least one step before saving to ENS.</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -495,15 +528,17 @@ export async function handleSaveToEns(id: string, state: SnapState) {
     });
 
     await updateUI(id, (
-      <Box>
-        <Banner title="ENS Save Queued" severity="success">
-          <Text>{`"${workflow.name}" will be saved when you open the Surecast site.`}</Text>
-        </Banner>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Home'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="ENS Save Queued" severity="success">
+            <Text>{`"${workflow.name}" will be saved when you open the Surecast site.`}</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Home'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -554,16 +589,18 @@ export async function handleSaveToEns(id: string, state: SnapState) {
   });
 
   await updateUI(id, (
-    <Box>
-      <Banner title="ENS Save Prepared" severity="success">
-        <Text>{`Ready to save "${workflow.name}" to ${state.userEns ?? 'ENS'}`}</Text>
-      </Banner>
-      <Text color="muted" size="sm">{`Key: ${ensKey}`}</Text>
-      <Text color="muted" size="sm">Open the Surecast site to confirm the transaction.</Text>
-      <Button name="back-home">
-        <Icon name="home" size="inherit" />
-        {' Back to Home'}
-      </Button>
-    </Box>
+    <Container>
+      <Box>
+        <Banner title="ENS Save Prepared" severity="success">
+          <Text>{`Ready to save "${workflow.name}" to ${state.userEns ?? 'ENS'}`}</Text>
+        </Banner>
+        <Text color="muted" size="sm">{`Key: ${ensKey}`}</Text>
+        <Text color="muted" size="sm">Open the Surecast site to confirm the transaction.</Text>
+        <Button name="back-home">
+          <Icon name="home" size="inherit" />
+          {' Back to Home'}
+        </Button>
+      </Box>
+    </Container>
   ));
 }

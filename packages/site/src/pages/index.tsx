@@ -4,7 +4,6 @@ import {
   ConnectButton,
   InstallFlaskButton,
   ReconnectButton,
-  Card,
 } from '../components';
 import { defaultSnapOrigin } from '../config';
 import {
@@ -244,21 +243,21 @@ const CHAIN_CONFIGS: Record<
 };
 
 const COLORS = {
-  primary: '#3F49E1',
-  primaryHover: '#7C83EB',
-  black: '#000000',
+  primary: '#D63384',
+  primaryHover: '#E24A9E',
+  accent: '#3F49E1',
   white: '#FFFFFF',
-  offWhite: '#F6F3F2',
-  grayLight: '#E4E7E9',
-  grayMid: '#798086',
-  grayDark: '#212529',
-  success: '#28a745',
-  successBg: '#d4edda',
-  error: '#dc3545',
-  errorBg: '#f8d7da',
-  errorText: '#721c24',
-  warningBg: '#fff3cd',
-  infoBg: '#e7edfb',
+  offWhite: '#F9F9FB',
+  grayLight: '#E8E8EF',
+  grayMid: '#6B7280',
+  grayDark: '#1F2937',
+  success: '#10B981',
+  successBg: '#ECFDF5',
+  error: '#EF4444',
+  errorBg: '#FEF2F2',
+  errorText: '#991B1B',
+  warningBg: '#FFFBEB',
+  infoBg: '#EFF4FF',
 };
 
 // ============================================================
@@ -270,10 +269,14 @@ const containerStyle: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   flex: 1,
-  marginTop: '7.6rem',
-  marginBottom: '7.6rem',
+  marginTop: '4rem',
+  marginBottom: '4rem',
   padding: '0 2rem',
-  fontFamily: 'Inter, system-ui, sans-serif',
+  maxWidth: '720px',
+  marginLeft: 'auto',
+  marginRight: 'auto',
+  width: '100%',
+  boxSizing: 'border-box',
 };
 
 const headingStyle: CSSProperties = {
@@ -291,22 +294,11 @@ const subtitleStyle: CSSProperties = {
   color: COLORS.grayMid,
 };
 
-const cardContainerStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-  maxWidth: '64.8rem',
-  width: '100%',
-  height: '100%',
-  marginTop: '1.5rem',
-};
-
 const errorMessageStyle: CSSProperties = {
   backgroundColor: COLORS.errorBg,
   border: `1px solid ${COLORS.error}`,
   color: COLORS.errorText,
-  borderRadius: '4px',
+  borderRadius: '12px',
   padding: '2.4rem',
   marginBottom: '2.4rem',
   marginTop: '2.4rem',
@@ -316,9 +308,9 @@ const errorMessageStyle: CSSProperties = {
 
 const sectionCardStyle: CSSProperties = {
   backgroundColor: COLORS.white,
-  border: `1px solid ${COLORS.black}`,
-  borderRadius: '4px',
-  boxShadow: `6px 6px 0px ${COLORS.black}`,
+  border: `1px solid ${COLORS.grayLight}`,
+  borderRadius: '12px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
   padding: '2rem',
   marginTop: '2rem',
   maxWidth: '64.8rem',
@@ -330,9 +322,9 @@ const sectionCardStyle: CSSProperties = {
 const getSectionCardStatus = (status: ExecutorStatus): CSSProperties => ({
   ...sectionCardStyle,
   ...(status === 'success'
-    ? { borderColor: COLORS.success, boxShadow: `6px 6px 0px ${COLORS.success}` }
+    ? { borderColor: COLORS.success }
     : status === 'error'
-      ? { borderColor: COLORS.error, boxShadow: `6px 6px 0px ${COLORS.error}` }
+      ? { borderColor: COLORS.error }
       : {}),
 });
 
@@ -349,7 +341,7 @@ const primaryButtonStyle: CSSProperties = {
   backgroundColor: COLORS.primary,
   color: COLORS.white,
   border: 'none',
-  borderRadius: '4px',
+  borderRadius: '8px',
   fontWeight: 600,
   fontSize: '1rem',
   cursor: 'pointer',
@@ -362,7 +354,7 @@ const retryButtonStyle: CSSProperties = {
   cursor: 'pointer',
   border: `1px solid ${COLORS.error}`,
   background: COLORS.white,
-  borderRadius: '4px',
+  borderRadius: '8px',
   color: COLORS.error,
   fontWeight: 600,
 };
@@ -455,7 +447,7 @@ function StepProgressBar({
               margin: '0.5rem 0',
               backgroundColor: STATUS_COLORS[stepExec.status],
               border: `1px solid ${highSlippage ? COLORS.error : COLORS.grayLight}`,
-              borderRadius: '4px',
+              borderRadius: '8px',
               fontSize: '0.95rem',
             }}
           >
@@ -1348,87 +1340,132 @@ const Index = () => {
   // RENDER
   // ============================================================
 
+  const isConnected = Boolean(installedSnap);
+
   return (
     <div style={containerStyle}>
       <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-      <h1 style={headingStyle}>
-        Welcome to <span style={{ color: COLORS.primary }}>Surecast</span>
-      </h1>
-      <p style={subtitleStyle}>DeFi workflow composer for MetaMask</p>
-      <div style={cardContainerStyle}>
-        {error && (
-          <div style={errorMessageStyle}>
-            <b>An error happened:</b> {error.message}
-          </div>
-        )}
-        {!isMetaMaskReady && (
-          <Card
-            content={{
-              title: 'Install MetaMask Flask',
-              description:
-                'Snaps is pre-release software only available in MetaMask Flask, a canary distribution for developers.',
-              button: <InstallFlaskButton />,
-            }}
-            fullWidth
-          />
-        )}
-        {!installedSnap && (
-          <Card
-            content={{
-              title: 'Connect',
-              description: 'Connect to and install the Surecast snap.',
-              button: (
-                <ConnectButton
-                  onClick={requestSnap}
-                  disabled={!isMetaMaskReady}
-                />
-              ),
-            }}
-            disabled={!isMetaMaskReady}
-          />
-        )}
-        {shouldDisplayReconnectButton(installedSnap) && (
-          <Card
-            content={{
-              title: 'Reconnect',
-              description:
-                'Update the snap after making changes during development.',
-              button: (
-                <ReconnectButton
-                  onClick={requestSnap}
-                  disabled={!installedSnap}
-                />
-              ),
-            }}
-            disabled={!installedSnap}
-          />
-        )}
-        {installedSnap && workflowInfo && (
-          <div style={{
-            ...sectionCardStyle,
-            backgroundColor: COLORS.infoBg,
-            borderColor: COLORS.primary,
-            boxShadow: `6px 6px 0px ${COLORS.primary}`,
-            textAlign: 'left',
+
+      {error && (
+        <div style={errorMessageStyle}>
+          <b>An error happened:</b> {error.message}
+        </div>
+      )}
+
+      {/* ===== DISCONNECTED STATE: Hero ===== */}
+      {!isConnected && (
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+          <h1 style={{ ...headingStyle, marginBottom: '1rem' }}>
+            <span style={{ color: COLORS.primary }}>Surecast</span>
+          </h1>
+          <p style={{
+            fontSize: '1.6rem',
+            color: COLORS.grayMid,
+            marginTop: 0,
+            marginBottom: '2rem',
+            maxWidth: '480px',
+            lineHeight: 1.5,
           }}>
-            <h3 style={sectionTitleStyle}>Current Workflow</h3>
-            <p style={{ margin: '0.25rem 0', fontSize: '1rem', fontWeight: 500 }}>
-              {workflowInfo.name}
-            </p>
-            <p style={txDescriptionStyle}>
-              {workflowInfo.stepCount} step{workflowInfo.stepCount === 1 ? '' : 's'} — Open the Surecast home in MetaMask to edit.
-            </p>
-            {savedCount > 0 && (
-              <p style={{ ...txDescriptionStyle, fontSize: '0.85rem' }}>
-                {savedCount} saved workflow{savedCount === 1 ? '' : 's'} in snap
-              </p>
-            )}
+            Compose, execute, and share DeFi workflows across 5 chains
+          </p>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            justifyContent: 'center',
+            marginBottom: '2.5rem',
+          }}>
+            {['Swap', 'Bridge', 'Deposit', 'Stake', 'ENS Sharing'].map((label) => (
+              <span key={label} style={{
+                padding: '0.4rem 1rem',
+                borderRadius: '999px',
+                backgroundColor: COLORS.infoBg,
+                color: COLORS.accent,
+                fontSize: '0.9rem',
+                fontWeight: 600,
+              }}>
+                {label}
+              </span>
+            ))}
           </div>
-        )}
-      </div>
+          {!isMetaMaskReady ? (
+            <div style={{
+              ...sectionCardStyle,
+              marginTop: 0,
+              padding: '2.5rem 2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
+              <h3 style={{ ...sectionTitleStyle, fontSize: '1.2rem' }}>Get Started</h3>
+              <p style={{ ...txDescriptionStyle, marginBottom: '1rem' }}>
+                Snaps is pre-release software only available in MetaMask Flask.
+              </p>
+              <InstallFlaskButton />
+            </div>
+          ) : (
+            <div style={{
+              ...sectionCardStyle,
+              marginTop: 0,
+              padding: '2.5rem 2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
+              <h3 style={{ ...sectionTitleStyle, fontSize: '1.2rem' }}>Get Started</h3>
+              <p style={{ ...txDescriptionStyle, marginBottom: '1rem' }}>
+                Connect to install the Surecast snap and start composing workflows.
+              </p>
+              <ConnectButton
+                onClick={requestSnap}
+                disabled={!isMetaMaskReady}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== CONNECTED STATE: Dashboard ===== */}
+      {isConnected && (
+        <>
+          <h1 style={{ ...headingStyle, fontSize: '2.4rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: COLORS.primary }}>Surecast</span> Dashboard
+          </h1>
+          <p style={subtitleStyle}>DeFi workflow composer for MetaMask</p>
+
+          {shouldDisplayReconnectButton(installedSnap) && (
+            <div style={{ marginTop: '1rem' }}>
+              <ReconnectButton onClick={requestSnap} disabled={!installedSnap} />
+            </div>
+          )}
+
+          {/* Workflow Card */}
+          {workflowInfo && (
+            <div style={{
+              ...sectionCardStyle,
+              backgroundColor: COLORS.infoBg,
+              borderColor: COLORS.primary,
+              textAlign: 'left',
+            }}>
+              <h3 style={sectionTitleStyle}>Current Workflow</h3>
+              <p style={{ margin: '0.25rem 0', fontSize: '1rem', fontWeight: 500 }}>
+                {workflowInfo.name}
+              </p>
+              <p style={txDescriptionStyle}>
+                {workflowInfo.stepCount} step{workflowInfo.stepCount === 1 ? '' : 's'} — Open the Surecast home in MetaMask to edit.
+              </p>
+              {savedCount > 0 && (
+                <p style={{ ...txDescriptionStyle, fontSize: '0.85rem' }}>
+                  {savedCount} saved workflow{savedCount === 1 ? '' : 's'} in snap
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Executor Section */}
-      {installedSnap && (
+      {isConnected && (
         <div style={getSectionCardStatus(execStatus)}>
           <h3 style={sectionTitleStyle}>Workflow Executor</h3>
 
@@ -1513,14 +1550,14 @@ const Index = () => {
       )}
 
       {/* ENS Section */}
-      {installedSnap && (
+      {isConnected && (
         <div style={{
           ...sectionCardStyle,
           marginTop: '1.5rem',
           ...(ensTxHash
-            ? { borderColor: COLORS.success, boxShadow: `6px 6px 0px ${COLORS.success}` }
+            ? { borderColor: COLORS.success }
             : ensStatus.includes('failed')
-              ? { borderColor: COLORS.error, boxShadow: `6px 6px 0px ${COLORS.error}` }
+              ? { borderColor: COLORS.error }
               : {}),
         }}>
           <h3 style={sectionTitleStyle}>ENS Workflow Sharing</h3>
@@ -1529,7 +1566,7 @@ const Index = () => {
             <div style={{
               backgroundColor: COLORS.warningBg,
               border: `1px solid ${COLORS.primary}`,
-              borderRadius: '4px',
+              borderRadius: '8px',
               padding: '1rem',
               marginBottom: '1rem',
               textAlign: 'left',
@@ -1587,7 +1624,7 @@ const Index = () => {
                   style={{
                     padding: '0.5rem 0.75rem',
                     border: `1px solid ${COLORS.grayLight}`,
-                    borderRadius: '4px',
+                    borderRadius: '8px',
                     fontSize: '0.95rem',
                     width: '200px',
                     fontFamily: 'inherit',
@@ -1634,7 +1671,7 @@ const Index = () => {
                   Your ENS Workflows
                 </p>
                 <button
-                  style={{ ...retryButtonStyle, fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                  style={{ ...retryButtonStyle, fontSize: '0.75rem', padding: '0.2rem 0.5rem', minHeight: 'auto', marginTop: 0, lineHeight: 1.2 }}
                   onClick={refreshEnsManifest}
                 >
                   Refresh from ENS
@@ -1656,7 +1693,7 @@ const Index = () => {
                         gap: '0.75rem',
                         padding: '0.4rem 0.75rem',
                         border: `1px solid ${COLORS.grayLight}`,
-                        borderRadius: '4px',
+                        borderRadius: '8px',
                         width: '100%',
                         maxWidth: '400px',
                       }}
@@ -1693,7 +1730,7 @@ const Index = () => {
                   style={{
                     padding: '0.5rem 0.75rem',
                     border: `1px solid ${COLORS.grayLight}`,
-                    borderRadius: '4px',
+                    borderRadius: '8px',
                     fontSize: '0.95rem',
                     width: '180px',
                     fontFamily: 'inherit',
@@ -1707,7 +1744,7 @@ const Index = () => {
                   style={{
                     padding: '0.5rem 0.75rem',
                     border: `1px solid ${COLORS.grayLight}`,
-                    borderRadius: '4px',
+                    borderRadius: '8px',
                     fontSize: '0.95rem',
                     width: '180px',
                     fontFamily: 'inherit',

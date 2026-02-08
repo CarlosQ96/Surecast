@@ -3,13 +3,10 @@ import { createGlobalStyle } from 'styled-components';
 
 const breakpoints = ['600px', '768px', '992px'];
 
-/**
- * Common theme properties.
- */
 const theme = {
   fonts: {
     default:
-      '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
+      'Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
     code: 'ui-monospace,Menlo,Monaco,"Cascadia Mono","Segoe UI Mono","Roboto Mono","Oxygen Mono","Ubuntu Monospace","Source Code Pro","Fira Mono","Droid Sans Mono","Courier New", monospace',
   },
   fontSizes: {
@@ -21,7 +18,7 @@ const theme = {
     small: '1.4rem',
   },
   radii: {
-    default: '24px',
+    default: '12px',
     button: '8px',
   },
   breakpoints,
@@ -31,98 +28,57 @@ const theme = {
     large: `@media screen and (min-width: ${breakpoints[2] as string})`,
   },
   shadows: {
-    default: '0px 7px 42px rgba(0, 0, 0, 0.1)',
-    button: '0px 0px 16.1786px rgba(0, 0, 0, 0.15);',
+    default: '0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06)',
+    button: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
 };
 
 /**
- * Light theme color properties.
+ * Light theme — the only theme (LI.FI-inspired, Surecast pink).
  */
 export const light: DefaultTheme = {
   colors: {
     background: {
-      default: '#FFFFFF',
-      alternative: '#F2F4F6',
-      inverse: '#141618',
+      default: '#F9F9FB',
+      alternative: '#FFFFFF',
+      inverse: '#1A1A2E',
     },
     icon: {
-      default: '#141618',
-      alternative: '#BBC0C5',
+      default: '#1F2937',
+      alternative: '#9CA3AF',
     },
     text: {
-      default: '#24272A',
-      muted: '#6A737D',
-      alternative: '#535A61',
+      default: '#1F2937',
+      muted: '#6B7280',
+      alternative: '#4B5563',
       inverse: '#FFFFFF',
     },
     border: {
-      default: '#BBC0C5',
+      default: '#E8E8EF',
     },
     primary: {
-      default: '#6F4CFF',
+      default: '#D63384',
       inverse: '#FFFFFF',
     },
     card: {
       default: '#FFFFFF',
     },
     error: {
-      default: '#d73a49',
-      alternative: '#b92534',
-      muted: '#d73a4919',
+      default: '#EF4444',
+      alternative: '#DC2626',
+      muted: '#FEF2F2',
     },
   },
   ...theme,
 };
 
 /**
- * Dark theme color properties
+ * Dark theme alias — kept for compatibility, points to light.
  */
-export const dark: DefaultTheme = {
-  colors: {
-    background: {
-      default: '#24272A',
-      alternative: '#141618',
-      inverse: '#FFFFFF',
-    },
-    icon: {
-      default: '#FFFFFF',
-      alternative: '#BBC0C5',
-    },
-    text: {
-      default: '#FFFFFF',
-      muted: '#FFFFFF',
-      alternative: '#D6D9DC',
-      inverse: '#24272A',
-    },
-    border: {
-      default: '#848C96',
-    },
-    primary: {
-      default: '#6F4CFF',
-      inverse: '#FFFFFF',
-    },
-    card: {
-      default: '#141618',
-    },
-    error: {
-      default: '#d73a49',
-      alternative: '#b92534',
-      muted: '#d73a4919',
-    },
-  },
-  ...theme,
-};
+export const dark: DefaultTheme = light;
 
-/**
- * Default style applied to the app.
- *
- * @param props - Styled Components props.
- * @returns Global style React component.
- */
 export const GlobalStyle = createGlobalStyle`
   html {
-    /* 62.5% of the base size of 16px = 10px.*/
     font-size: 62.5%;
   }
 
@@ -132,10 +88,8 @@ export const GlobalStyle = createGlobalStyle`
     font-family: ${(props) => props.theme.fonts.default};
     font-size: ${(props) => props.theme.fontSizes.text};
     margin: 0;
-  }
-
-  * {
-    transition: background-color .1s linear;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -156,9 +110,9 @@ export const GlobalStyle = createGlobalStyle`
   button {
     font-size: ${(props) => props.theme.fontSizes.small};
     border-radius: ${(props) => props.theme.radii.button};
-    background-color: ${(props) => props.theme.colors.background?.inverse};
-    color: ${(props) => props.theme.colors.text?.inverse};
-    border: 1px solid ${(props) => props.theme.colors.background?.inverse};
+    background-color: #D63384;
+    color: #FFFFFF;
+    border: 1px solid #D63384;
     font-weight: bold;
     padding: 1rem;
     min-height: 4.2rem;
@@ -166,22 +120,24 @@ export const GlobalStyle = createGlobalStyle`
     transition: all .2s ease-in-out;
 
     &:hover {
-      background-color: transparent;
-      border: 1px solid ${(props) => props.theme.colors.background?.inverse};
-      color: ${(props) => props.theme.colors.text?.default};
+      background-color: #E24A9E;
+      border-color: #E24A9E;
+      color: #FFFFFF;
     }
 
     &:disabled,
     &[disabled] {
-      border: 1px solid ${(props) => props.theme.colors.background?.inverse};
+      background-color: #E8E8EF;
+      border-color: #E8E8EF;
+      color: #9CA3AF;
       cursor: not-allowed;
     }
 
     &:disabled:hover,
     &[disabled]:hover {
-      background-color: ${(props) => props.theme.colors.background?.inverse};
-      color: ${(props) => props.theme.colors.text?.inverse};
-      border: 1px solid ${(props) => props.theme.colors.background?.inverse};
+      background-color: #E8E8EF;
+      border-color: #E8E8EF;
+      color: #9CA3AF;
     }
   }
 `;

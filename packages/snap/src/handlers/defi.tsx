@@ -5,6 +5,7 @@ import {
   Button,
   Icon,
   Section,
+  Container,
 } from '@metamask/snaps-sdk/jsx';
 
 import { CHAINS, CHAIN_NAMES } from '../data/chains';
@@ -31,19 +32,21 @@ export async function handleDepositSubmit(
 
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Invalid Amount" severity="warning">
-          <Text>Please enter a valid positive number.</Text>
-        </Banner>
-        <Button name="step-deposit" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Invalid Amount" severity="warning">
+            <Text>Please enter a valid positive number.</Text>
+          </Banner>
+          <Button name="step-deposit" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -52,19 +55,21 @@ export async function handleDepositSubmit(
   if (!fromTokenInfo) {
     const chainName = CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain';
     await updateUI(id, (
-      <Box>
-        <Banner title="Token Not Found" severity="danger">
-          <Text>{`${fromSymbol} is not available on ${chainName}.`}</Text>
-        </Banner>
-        <Button name="step-deposit" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Token Not Found" severity="danger">
+            <Text>{`${fromSymbol} is not available on ${chainName}.`}</Text>
+          </Banner>
+          <Button name="step-deposit" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -74,19 +79,21 @@ export async function handleDepositSubmit(
     const protocolLabel = PROTOCOL_LABELS[protocol] ?? protocol;
     const chainName = CHAIN_NAMES[toChain as keyof typeof CHAIN_NAMES] ?? 'this chain';
     await updateUI(id, (
-      <Box>
-        <Banner title="Vault Not Found" severity="danger">
-          <Text>{`${protocolLabel} does not support ${depositAsset} deposits on ${chainName}.`}</Text>
-        </Banner>
-        <Button name="step-deposit" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Vault Not Found" severity="danger">
+            <Text>{`${protocolLabel} does not support ${depositAsset} deposits on ${chainName}.`}</Text>
+          </Banner>
+          <Button name="step-deposit" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -123,21 +130,23 @@ export async function handleDepositSubmit(
   const protocolLabel = PROTOCOL_LABELS[protocol] ?? protocol;
   const amountLabel = useAll ? 'all from previous step' : `${humanAmount} ${fromSymbol}`;
   await updateUI(id, (
-    <Box>
-      <Banner title="Step Added" severity="success">
-        <Text>{`Deposit ${amountLabel} → ${vaultToken.symbol} (${protocolLabel})`}</Text>
-      </Banner>
-      <Section>
-        <Button name="add-step" variant="primary">
-          <Icon name="add" size="inherit" />
-          {' Add Another Step'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Workflow'}
-        </Button>
-      </Section>
-    </Box>
+    <Container>
+      <Box>
+        <Banner title="Step Added" severity="success">
+          <Text>{`Deposit ${amountLabel} → ${vaultToken.symbol} (${protocolLabel})`}</Text>
+        </Banner>
+        <Section>
+          <Button name="add-step" variant="primary">
+            <Icon name="add" size="inherit" />
+            {' Add Another Step'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Workflow'}
+          </Button>
+        </Section>
+      </Box>
+    </Container>
   ));
 }
 
@@ -157,19 +166,21 @@ export async function handleStakeSubmit(
 
   if (!useAll && (!humanAmount || isNaN(Number(humanAmount)) || Number(humanAmount) <= 0)) {
     await updateUI(id, (
-      <Box>
-        <Banner title="Invalid Amount" severity="warning">
-          <Text>Please enter a valid positive number.</Text>
-        </Banner>
-        <Button name="step-stake" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Invalid Amount" severity="warning">
+            <Text>Please enter a valid positive number.</Text>
+          </Banner>
+          <Button name="step-stake" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -178,19 +189,21 @@ export async function handleStakeSubmit(
   if (!fromTokenInfo) {
     const chainName = CHAIN_NAMES[fromChain as keyof typeof CHAIN_NAMES] ?? 'this chain';
     await updateUI(id, (
-      <Box>
-        <Banner title="Token Not Found" severity="danger">
-          <Text>{`${fromSymbol} is not available on ${chainName}.`}</Text>
-        </Banner>
-        <Button name="step-stake" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Token Not Found" severity="danger">
+            <Text>{`${fromSymbol} is not available on ${chainName}.`}</Text>
+          </Banner>
+          <Button name="step-stake" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -200,19 +213,21 @@ export async function handleStakeSubmit(
   if (!vaultToken) {
     const protocolLabel = PROTOCOL_LABELS[protocol] ?? protocol;
     await updateUI(id, (
-      <Box>
-        <Banner title="Staking Not Available" severity="danger">
-          <Text>{`${protocolLabel} staking is not configured.`}</Text>
-        </Banner>
-        <Button name="step-stake" variant="primary">
-          <Icon name="arrow-left" size="inherit" />
-          {' Try Again'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back'}
-        </Button>
-      </Box>
+      <Container>
+        <Box>
+          <Banner title="Staking Not Available" severity="danger">
+            <Text>{`${protocolLabel} staking is not configured.`}</Text>
+          </Banner>
+          <Button name="step-stake" variant="primary">
+            <Icon name="arrow-left" size="inherit" />
+            {' Try Again'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      </Container>
     ));
     return;
   }
@@ -251,20 +266,22 @@ export async function handleStakeSubmit(
   const isCrossChain = fromChain !== toChain;
   const crossChainNote = isCrossChain ? ' (cross-chain via LI.FI)' : '';
   await updateUI(id, (
-    <Box>
-      <Banner title="Step Added" severity="success">
-        <Text>{`Stake ${amountLabel} → ${vaultToken.symbol} (${protocolLabel})${crossChainNote}`}</Text>
-      </Banner>
-      <Section>
-        <Button name="add-step" variant="primary">
-          <Icon name="add" size="inherit" />
-          {' Add Another Step'}
-        </Button>
-        <Button name="back-home">
-          <Icon name="home" size="inherit" />
-          {' Back to Workflow'}
-        </Button>
-      </Section>
-    </Box>
+    <Container>
+      <Box>
+        <Banner title="Step Added" severity="success">
+          <Text>{`Stake ${amountLabel} → ${vaultToken.symbol} (${protocolLabel})${crossChainNote}`}</Text>
+        </Banner>
+        <Section>
+          <Button name="add-step" variant="primary">
+            <Icon name="add" size="inherit" />
+            {' Add Another Step'}
+          </Button>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back to Workflow'}
+          </Button>
+        </Section>
+      </Box>
+    </Container>
   ));
 }

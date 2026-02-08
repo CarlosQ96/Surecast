@@ -1,8 +1,4 @@
-import styled, { useTheme } from 'styled-components';
-
-import { MetaMask } from './MetaMask';
-import { PoweredBy } from './PoweredBy';
-import { ReactComponent as MetaMaskFox } from '../assets/metamask_fox.svg';
+import styled from 'styled-components';
 
 const FooterWrapper = styled.footer`
   display: flex;
@@ -14,35 +10,36 @@ const FooterWrapper = styled.footer`
   border-top: 1px solid ${(props) => props.theme.colors.border?.default};
 `;
 
-const PoweredByButton = styled.a`
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  padding: 1.2rem;
-  border-radius: ${({ theme }) => theme.radii.button};
-  box-shadow: ${({ theme }) => theme.shadows.button};
-  background-color: ${({ theme }) => theme.colors.background?.alternative};
+const FooterText = styled.p`
+  font-size: ${(props) => props.theme.fontSizes.small};
+  color: ${(props) => props.theme.colors.text?.muted};
+  margin: 0;
 `;
 
-const PoweredByContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  margin-left: 1rem;
+const FooterLink = styled.a`
+  color: #D63384;
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 export const Footer = () => {
-  const theme = useTheme();
-
   return (
     <FooterWrapper>
-      <PoweredByButton href="https://docs.metamask.io/" target="_blank">
-        <MetaMaskFox />
-        <PoweredByContainer>
-          <PoweredBy color={theme.colors.text?.muted} />
-          <MetaMask color={theme.colors.text?.default} />
-        </PoweredByContainer>
-      </PoweredByButton>
+      <FooterText>
+        Surecast — Built with{' '}
+        <FooterLink href="https://li.fi" target="_blank" rel="noopener noreferrer">
+          LI.FI
+        </FooterLink>
+        {' + '}
+        <FooterLink href="https://ens.domains" target="_blank" rel="noopener noreferrer">
+          ENS
+        </FooterLink>
+        {' | HackMoney 2025'}
+      </FooterText>
     </FooterWrapper>
   );
 };

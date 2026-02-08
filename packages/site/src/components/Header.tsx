@@ -1,9 +1,7 @@
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 
 import { HeaderButtons } from './Buttons';
-import { SnapLogo } from './SnapLogo';
-import { Toggle } from './Toggle';
-import { getThemePreference } from '../utils';
+import surecastLogo from '../assets/surecast_logo.png';
 
 const HeaderWrapper = styled.header`
   display: flex;
@@ -12,6 +10,7 @@ const HeaderWrapper = styled.header`
   align-items: center;
   padding: 2.4rem;
   border-bottom: 1px solid ${(props) => props.theme.colors.border?.default};
+  background-color: #FFFFFF;
 `;
 
 const Title = styled.p`
@@ -19,6 +18,7 @@ const Title = styled.p`
   font-weight: bold;
   margin: 0;
   margin-left: 1.2rem;
+  color: ${(props) => props.theme.colors.text?.default};
   ${({ theme }) => theme.mediaQueries.small} {
     display: none;
   }
@@ -30,32 +30,19 @@ const LogoWrapper = styled.div`
   align-items: center;
 `;
 
-const RightContainer = styled.div`
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+const LogoImage = styled.img`
+  height: 40px;
+  width: auto;
 `;
 
-export const Header = ({
-  handleToggleClick,
-}: {
-  handleToggleClick: () => void;
-}) => {
-  const theme = useTheme();
-
+export const Header = () => {
   return (
     <HeaderWrapper>
       <LogoWrapper>
-        <SnapLogo color={theme.colors.icon?.default} size={36} />
+        <LogoImage src={surecastLogo} alt="Surecast" />
         <Title>Surecast</Title>
       </LogoWrapper>
-      <RightContainer>
-        <Toggle
-          onToggle={handleToggleClick}
-          defaultChecked={getThemePreference()}
-        />
-        <HeaderButtons />
-      </RightContainer>
+      <HeaderButtons />
     </HeaderWrapper>
   );
 };

@@ -11,8 +11,10 @@ import {
   Button,
   Divider,
   Section,
+  Card,
   Icon,
   Banner,
+  Container,
 } from '@metamask/snaps-sdk/jsx';
 
 import { getState, setState, writeState, refreshState } from './state';
@@ -75,37 +77,65 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
 
       case 'add-step': {
         await updateUI(id, (
-          <Box>
-            <Box direction="horizontal" alignment="space-between">
-              <Heading>Add Step</Heading>
-              <Icon name="category" color="primary" />
+          <Container>
+            <Box>
+              <Box direction="horizontal" alignment="space-between">
+                <Heading>Add Step</Heading>
+                <Icon name="category" color="primary" />
+              </Box>
+              <Text color="muted" size="sm">Choose an action for this step</Text>
+              <Divider />
+              <Section>
+                <Card
+                  title="Swap"
+                  description="Same or cross-chain"
+                  value="Exchange tokens via LI.FI"
+                />
+                <Button name="step-swap" variant="primary">
+                  <Icon name="swap-horizontal" size="inherit" />
+                  {' Select Swap'}
+                </Button>
+              </Section>
+              <Section>
+                <Card
+                  title="Deposit"
+                  description="Aave V3"
+                  value="Earn yield on lending"
+                />
+                <Button name="step-deposit" variant="primary">
+                  <Icon name="money" size="inherit" />
+                  {' Select Deposit'}
+                </Button>
+              </Section>
+              <Section>
+                <Card
+                  title="Stake"
+                  description="Lido / EtherFi"
+                  value="Liquid staking tokens"
+                />
+                <Button name="step-stake" variant="primary">
+                  <Icon name="stake" size="inherit" />
+                  {' Select Stake'}
+                </Button>
+              </Section>
+              <Section>
+                <Card
+                  title="Bridge"
+                  description="Coming Soon"
+                  value="Use Swap with different chains"
+                />
+                <Button name="step-bridge">
+                  <Icon name="bridge" size="inherit" />
+                  {' Bridge Info'}
+                </Button>
+              </Section>
+              <Divider />
+              <Button name="back-home">
+                <Icon name="arrow-left" size="inherit" />
+                {' Back'}
+              </Button>
             </Box>
-            <Text color="muted" size="sm">Choose an action for this step</Text>
-            <Divider />
-            <Section>
-              <Button name="step-swap" variant="primary">
-                <Icon name="swap-horizontal" size="inherit" />
-                {' Swap tokens'}
-              </Button>
-              <Button name="step-bridge">
-                <Icon name="bridge" size="inherit" />
-                {' Bridge cross-chain'}
-              </Button>
-              <Button name="step-deposit">
-                <Icon name="money" size="inherit" />
-                {' Deposit (Aave/Morpho)'}
-              </Button>
-              <Button name="step-stake">
-                <Icon name="stake" size="inherit" />
-                {' Stake (Lido/EtherFi)'}
-              </Button>
-            </Section>
-            <Divider />
-            <Button name="back-home">
-              <Icon name="arrow-left" size="inherit" />
-              {' Back'}
-            </Button>
-          </Box>
+          </Container>
         ));
         return;
       }
@@ -140,25 +170,27 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
 
       case 'step-bridge': {
         await updateUI(id, (
-          <Box>
-            <Box direction="horizontal" alignment="space-between">
-              <Heading>Bridge</Heading>
-              <Icon name="clock" color="muted" />
+          <Container>
+            <Box>
+              <Box direction="horizontal" alignment="space-between">
+                <Heading>Bridge</Heading>
+                <Icon name="clock" color="muted" />
+              </Box>
+              <Banner title="Coming Soon" severity="info">
+                <Text>Use Swap with different from/to chains for cross-chain bridging.</Text>
+              </Banner>
+              <Section>
+                <Button name="add-step" variant="primary">
+                  <Icon name="arrow-left" size="inherit" />
+                  {' Back to Actions'}
+                </Button>
+                <Button name="back-home">
+                  <Icon name="home" size="inherit" />
+                  {' Home'}
+                </Button>
+              </Section>
             </Box>
-            <Banner title="Coming Soon" severity="info">
-              <Text>Use Swap with different from/to chains for cross-chain bridging.</Text>
-            </Banner>
-            <Section>
-              <Button name="add-step" variant="primary">
-                <Icon name="arrow-left" size="inherit" />
-                {' Back to Actions'}
-              </Button>
-              <Button name="back-home">
-                <Icon name="home" size="inherit" />
-                {' Home'}
-              </Button>
-            </Section>
-          </Box>
+          </Container>
         ));
         return;
       }
@@ -247,15 +279,17 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         params: {
           id,
           ui: (
-            <Box>
-              <Banner title="Error" severity="danger">
-                <Text>{msg}</Text>
-              </Banner>
-              <Button name="back-home" variant="primary">
-                <Icon name="home" size="inherit" />
-                {' Back to Home'}
-              </Button>
-            </Box>
+            <Container>
+              <Box>
+                <Banner title="Error" severity="danger">
+                  <Text>{msg}</Text>
+                </Banner>
+                <Button name="back-home" variant="primary">
+                  <Icon name="home" size="inherit" />
+                  {' Back to Home'}
+                </Button>
+              </Box>
+            </Container>
           ),
         },
       });
@@ -281,19 +315,21 @@ export const onInstall: OnInstallHandler = async () => {
     params: {
       type: 'alert',
       content: (
-        <Box>
-          <Box direction="horizontal" alignment="space-between">
-            <Heading size="lg">Welcome to Surecast</Heading>
-            <Icon name="flash" color="primary" />
+        <Container>
+          <Box>
+            <Box direction="horizontal" alignment="space-between">
+              <Heading size="lg">Welcome to Surecast</Heading>
+              <Icon name="flash" color="primary" />
+            </Box>
+            <Text>
+              Build multi-step DeFi workflows and execute them seamlessly.
+            </Text>
+            <Divider />
+            <Banner title="Get Started" severity="success">
+              <Text>Open the Surecast home page from MetaMask to start composing workflows.</Text>
+            </Banner>
           </Box>
-          <Text>
-            Build multi-step DeFi workflows and execute them seamlessly.
-          </Text>
-          <Divider />
-          <Text color="muted" size="sm">
-            Open the Surecast home page from MetaMask to get started.
-          </Text>
-        </Box>
+        </Container>
       ),
     },
   });

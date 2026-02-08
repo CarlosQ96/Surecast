@@ -6,15 +6,14 @@ import { useMetaMask, useRequestSnap } from '../hooks';
 import { shouldDisplayReconnectButton } from '../utils';
 
 const Link = styled.a`
-  display: flex;
-  align-self: flex-start;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: ${(props) => props.theme.fontSizes.small};
   border-radius: ${(props) => props.theme.radii.button};
-  border: 1px solid ${(props) => props.theme.colors.background?.inverse};
-  background-color: ${(props) => props.theme.colors.background?.inverse};
-  color: ${(props) => props.theme.colors.text?.inverse};
+  border: 1px solid #D63384;
+  background-color: transparent;
+  color: #D63384;
   text-decoration: none;
   font-weight: bold;
   padding: 1rem;
@@ -22,9 +21,8 @@ const Link = styled.a`
   transition: all 0.2s ease-in-out;
 
   &:hover {
-    background-color: transparent;
-    border: 1px solid ${(props) => props.theme.colors.background?.inverse};
-    color: ${(props) => props.theme.colors.text?.default};
+    background-color: #D63384;
+    color: #FFFFFF;
   }
 
   ${({ theme }) => theme.mediaQueries.small} {
@@ -34,11 +32,9 @@ const Link = styled.a`
 `;
 
 const Button = styled.button`
-  display: flex;
-  align-self: flex-start;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: auto;
   ${({ theme }) => theme.mediaQueries.small} {
     width: 100%;
   }
@@ -54,12 +50,12 @@ const ConnectedContainer = styled.div`
   align-items: center;
   justify-content: center;
   font-size: ${(props) => props.theme.fontSizes.small};
-  border-radius: ${(props) => props.theme.radii.button};
-  border: 1px solid ${(props) => props.theme.colors.background?.inverse};
-  background-color: ${(props) => props.theme.colors.background?.inverse};
-  color: ${(props) => props.theme.colors.text?.inverse};
+  border-radius: 999px;
+  border: 1px solid #10B981;
+  background-color: #ECFDF5;
+  color: #065F46;
   font-weight: bold;
-  padding: 1.2rem;
+  padding: 0.8rem 1.6rem;
 `;
 
 const ConnectedIndicator = styled.div`
@@ -67,7 +63,7 @@ const ConnectedIndicator = styled.div`
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: green;
+  background-color: #10B981;
 `;
 
 export const InstallFlaskButton = () => (
@@ -93,10 +89,6 @@ export const ReconnectButton = (props: ComponentProps<typeof Button>) => {
       <ButtonText>Reconnect</ButtonText>
     </Button>
   );
-};
-
-export const SendHelloButton = (props: ComponentProps<typeof Button>) => {
-  return <Button {...props}>Send message</Button>;
 };
 
 export const HeaderButtons = () => {
