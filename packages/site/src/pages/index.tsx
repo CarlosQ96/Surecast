@@ -63,6 +63,16 @@ interface StepExecution {
   quotedOutputDecimals: number | null;
 }
 
+interface QuoteInfo {
+  gasUsd: string;
+  estimatedSeconds: number;
+  toAmount: string;
+  toAmountMin: string;
+  toSymbol: string;
+  toDecimals: number;
+  slippagePercent: number;
+}
+
 interface WorkflowExecution {
   workflowId: string;
   startedAt: number;
@@ -416,9 +426,11 @@ const STATUS_COLORS: Record<StepExecutionStatus, string> = {
 function StepProgressBar({
   execution,
   workflow,
+  quoteInfos,
 }: {
   execution: WorkflowExecution;
   workflow: FullWorkflow;
+  quoteInfos: Record<number, QuoteInfo>;
 }) {
   return (
     <div style={{ width: '100%', marginTop: '1rem', textAlign: 'left' }}>
@@ -432,41 +444,61 @@ function StepProgressBar({
         const amountLabel = step.config.useAllFromPrevious
           ? 'chained'
           : step.config.amount ?? '?';
+        const quote = quoteInfos[i];
+        const highSlippage = quote && quote.slippagePercent > 2;
 
         return (
           <div
             key={stepExec.stepId}
             style={{
-              display: 'flex',
-              alignItems: 'center',
               padding: '0.75rem 1rem',
               margin: '0.5rem 0',
               backgroundColor: STATUS_COLORS[stepExec.status],
-              border: `1px solid ${COLORS.grayLight}`,
+              border: `1px solid ${highSlippage ? COLORS.error : COLORS.grayLight}`,
               borderRadius: '4px',
               fontSize: '0.95rem',
             }}
           >
-            <span style={{ marginRight: '0.75rem', fontSize: '1.2rem' }}>
-              {STATUS_ICONS[stepExec.status]}
-            </span>
-            <span style={{ flex: 1, fontWeight: 500 }}>
-              Step {i + 1}: {amountLabel} {step.config.fromToken}
-              {isCrossChain ? ` on ${fromChain}` : ''} → {step.config.toToken}
-              {isCrossChain ? ` on ${toChain}` : ''}
-            </span>
-            <span style={{ fontSize: '0.8rem', color: COLORS.grayMid, marginLeft: '0.5rem' }}>
-              {stepExec.status}
-            </span>
-            {stepExec.txHash && (
-              <a
-                href={getBlockExplorerUrl(stepExec.chainId, stepExec.txHash)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: COLORS.primary }}
-              >
-                View tx
-              </a>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '0.75rem', fontSize: '1.2rem' }}>
+                {STATUS_ICONS[stepExec.status]}
+              </span>
+              <span style={{ flex: 1, fontWeight: 500 }}>
+                Step {i + 1}: {amountLabel} {step.config.fromToken}
+                {isCrossChain ? ` on ${fromChain}` : ''} → {step.config.toToken}
+                {isCrossChain ? ` on ${toChain}` : ''}
+                {step.config.protocol ? ` (${step.config.protocol})` : ''}
+              </span>
+              <span style={{ fontSize: '0.8rem', color: COLORS.grayMid, marginLeft: '0.5rem' }}>
+                {stepExec.status}
+              </span>
+              {stepExec.txHash && (
+                <a
+                  href={getBlockExplorerUrl(stepExec.chainId, stepExec.txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: COLORS.primary }}
+                >
+                  View tx
+                </a>
+              )}
+            </div>
+            {quote && (
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                marginTop: '0.4rem',
+                marginLeft: '2.15rem',
+                fontSize: '0.8rem',
+                color: COLORS.grayMid,
+              }}>
+                <span>Gas: ~${quote.gasUsd}</span>
+                <span>~{quote.estimatedSeconds}s</span>
+                <span style={highSlippage ? { color: COLORS.error, fontWeight: 600 } : {}}>
+                  Slippage: {quote.slippagePercent.toFixed(1)}%
+                  {highSlippage ? ' ⚠' : ''}
+                </span>
+              </div>
             )}
           </div>
         );
@@ -497,6 +529,7 @@ const Index = () => {
   const [execMessage, setExecMessage] = useState('');
   const [workflow, setWorkflow] = useState<FullWorkflow | null>(null);
   const [execution, setExecution] = useState<WorkflowExecution | null>(null);
+  const [quoteInfos, setQuoteInfos] = useState<Record<number, QuoteInfo>>({});
 
   // ENS state
   const [ensName, setEnsName] = useState<string | null>(null);
@@ -766,10 +799,37 @@ const Index = () => {
         });
 
         try {
-          await invokeSnap({
+          const quoteResult = (await invokeSnap({
             method: 'prepareStepQuote',
             params: { stepIndex: i },
-          });
+          })) as {
+            gasUsd: string;
+            estimatedSeconds: number;
+            toAmount: string;
+            toAmountMin: string;
+            toSymbol: string;
+            toDecimals: number;
+          } | null;
+
+          if (quoteResult) {
+            const toAmtNum = parseFloat(quoteResult.toAmount);
+            const toMinNum = parseFloat(quoteResult.toAmountMin);
+            const slippagePercent =
+              toAmtNum > 0 ? ((toAmtNum - toMinNum) / toAmtNum) * 100 : 0;
+
+            setQuoteInfos((prev) => ({
+              ...prev,
+              [i]: {
+                gasUsd: quoteResult.gasUsd,
+                estimatedSeconds: quoteResult.estimatedSeconds,
+                toAmount: quoteResult.toAmount,
+                toAmountMin: quoteResult.toAmountMin,
+                toSymbol: quoteResult.toSymbol,
+                toDecimals: quoteResult.toDecimals,
+                slippagePercent,
+              },
+            }));
+          }
         } catch (quoteErr) {
           const msg = quoteErr instanceof Error ? quoteErr.message : String(quoteErr);
           await invokeSnap({
@@ -1280,6 +1340,7 @@ const Index = () => {
     setExecMessage('');
     setWorkflow(null);
     setExecution(null);
+    setQuoteInfos({});
     syncWithSnap();
   }, [syncWithSnap]);
 
@@ -1402,7 +1463,7 @@ const Index = () => {
               <div style={spinnerStyle} />
               <p style={statusMessageStyle}>{execMessage}</p>
               {execution && workflow && (
-                <StepProgressBar execution={execution} workflow={workflow} />
+                <StepProgressBar execution={execution} workflow={workflow} quoteInfos={quoteInfos} />
               )}
             </>
           )}
@@ -1411,7 +1472,7 @@ const Index = () => {
             <>
               <p style={statusMessageStyle}>{execMessage}</p>
               {execution && workflow && (
-                <StepProgressBar execution={execution} workflow={workflow} />
+                <StepProgressBar execution={execution} workflow={workflow} quoteInfos={quoteInfos} />
               )}
               <button style={primaryButtonStyle} onClick={retryFromStep}>
                 Retry from failed step
@@ -1429,7 +1490,7 @@ const Index = () => {
             <>
               <p style={statusMessageStyle}>{execMessage}</p>
               {execution && workflow && (
-                <StepProgressBar execution={execution} workflow={workflow} />
+                <StepProgressBar execution={execution} workflow={workflow} quoteInfos={quoteInfos} />
               )}
               <button
                 style={{ ...primaryButtonStyle, marginTop: '1rem' }}
