@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["SNAP_ORIGIN=npm:surecast-snap npm run --workspace packages/site build"]
+
+[start]
+cmd = "npx -y serve@14 packages/site/public -l ${PORT:-3000} -s"
