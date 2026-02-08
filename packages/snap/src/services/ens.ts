@@ -197,6 +197,7 @@ type CompactStep = {
   tc?: number;
   a?: string;
   all?: boolean;
+  p?: string;
 };
 
 type CompactWorkflow = {
@@ -219,6 +220,7 @@ export function serializeWorkflow(workflow: Workflow): string {
       if (s.config.toChain) step.tc = s.config.toChain;
       if (s.config.amount) step.a = s.config.amount;
       if (s.config.useAllFromPrevious) step.all = true;
+      if (s.config.protocol) step.p = s.config.protocol;
       return step;
     }),
   };
@@ -241,6 +243,7 @@ export function deserializeWorkflow(json: string): Workflow {
         ...(s.tc ? { toChain: s.tc } : {}),
         ...(s.a ? { amount: s.a } : {}),
         ...(s.all ? { useAllFromPrevious: true } : {}),
+        ...(s.p ? { protocol: s.p } : {}),
       },
     })),
     createdAt: compact.ts,

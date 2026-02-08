@@ -13,6 +13,7 @@ import {
 
 import { CHAINS, CHAIN_NAMES } from '../data/chains';
 import { TOKENS } from '../data/tokens';
+import { getVaultTokensForChain } from '../data/vaults';
 import { getSwapQuote, formatTokenAmount } from '../services/lifi';
 import { writeState } from '../state';
 import {
@@ -191,11 +192,12 @@ export async function handleGetQuote(id: string, state: SnapState) {
   }
 
   const firstStep = workflow.steps[0];
-  if (!firstStep || firstStep.type !== 'swap') {
+  const quotableTypes = ['swap', 'deposit', 'stake'];
+  if (!firstStep || !quotableTypes.includes(firstStep.type)) {
     await updateUI(id, (
       <Box>
         <Banner title="Not Supported Yet" severity="warning">
-          <Text>Only swap steps can be quoted right now.</Text>
+          <Text>This step type cannot be quoted yet.</Text>
         </Banner>
         <Button name="back-home">
           <Icon name="home" size="inherit" />
@@ -231,6 +233,30 @@ export async function handleGetQuote(id: string, state: SnapState) {
     return;
   }
 
+  // Resolve toToken address: vault registry for deposit/stake, TOKENS for swap
+  let resolvedToAddress: string;
+  if (firstStep.type === 'deposit' || firstStep.type === 'stake') {
+    const vaultTokens = getVaultTokensForChain(toChain);
+    const vaultToken = vaultTokens.find((vault) => vault.symbol === toSymbol);
+    if (!vaultToken) {
+      await updateUI(id, (
+        <Box>
+          <Banner title="Vault Token Error" severity="danger">
+            <Text>{`Cannot find vault token ${toSymbol} on chain ${toChain}.`}</Text>
+          </Banner>
+          <Button name="back-home">
+            <Icon name="home" size="inherit" />
+            {' Back'}
+          </Button>
+        </Box>
+      ));
+      return;
+    }
+    resolvedToAddress = vaultToken.address;
+  } else {
+    resolvedToAddress = toTokenInfo?.address ?? toSymbol;
+  }
+
   await updateUI(id, (
     <Box>
       <Box direction="horizontal" alignment="space-between">
@@ -250,7 +276,7 @@ export async function handleGetQuote(id: string, state: SnapState) {
       fromChain,
       toChain,
       fromTokenInfo.address,
-      toTokenInfo?.address ?? toSymbol,
+      resolvedToAddress,
       rawAmount,
       userAddr,
       state.preferences.slippage / 100,

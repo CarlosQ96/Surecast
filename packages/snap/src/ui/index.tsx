@@ -73,7 +73,9 @@ export function renderHome(state: SnapState) {
                       : fromChainName
                   }
                   value={`${amountDisplay} ${s.config.fromToken ?? '?'} → ${s.config.toToken ?? '?'}`}
-                  extra={s.type}
+                  extra={s.config.protocol
+                    ? `${s.type} · ${s.config.protocol}`
+                    : s.type}
                 />
                 <Button
                   name={`delete-step-${s.id}`}

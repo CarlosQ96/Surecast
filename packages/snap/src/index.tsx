@@ -19,7 +19,9 @@ import { getState, setState, writeState, refreshState } from './state';
 /* setState only used by onInstall; getState returns from cache after first call */
 import { generateId } from './helpers';
 import { renderHome, renderSwapForm, renderRenameForm, renderWorkflowList, updateUI } from './ui';
+import { renderDepositForm, renderStakeForm } from './ui/defi-forms';
 import { handleSwapSubmit, handleGetQuote, handleRename, handleSaveToEns, handleSaveWorkflow, handleLoadSavedWorkflow, handleDeleteSavedWorkflow } from './handlers';
+import { handleDepositSubmit, handleStakeSubmit } from './handlers/defi';
 
 export { onRpcRequest } from './rpc';
 
@@ -43,9 +45,15 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
     const state = await getState();
 
     // 2) Only read form state for submit buttons (saves 1 SES call on navigation)
-    const needsFormData = event.name === 'submit-swap' || event.name === 'submit-rename';
+    const needsFormData =
+      event.name === 'submit-swap' ||
+      event.name === 'submit-rename' ||
+      event.name === 'submit-deposit' ||
+      event.name === 'submit-stake';
     let swapForm: Record<string, string> = {};
     let renameForm: Record<string, string> = {};
+    let depositForm: Record<string, string> = {};
+    let stakeForm: Record<string, string> = {};
     if (needsFormData) {
       const interfaceState = await snap.request({
         method: 'snap_getInterfaceState',
@@ -54,6 +62,8 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
       const formState = interfaceState as Record<string, Record<string, string>>;
       swapForm = formState?.['swap-form'] ?? {};
       renameForm = formState?.['rename-form'] ?? {};
+      depositForm = formState?.['deposit-form'] ?? {};
+      stakeForm = formState?.['stake-form'] ?? {};
     }
 
     // 3) Route by button name — each case does 1-2 SES calls max
@@ -106,18 +116,37 @@ export const onUserInput: OnUserInputHandler = async ({ id, event }) => {
         return;
       }
 
-      case 'step-bridge':
-      case 'step-deposit':
+      case 'step-deposit': {
+        const depositStepCount = state.currentWorkflow?.steps.length ?? 0;
+        await updateUI(id, renderDepositForm(depositStepCount));
+        return;
+      }
+
       case 'step-stake': {
-        const actionName = (event.name ?? '').replace('step-', '');
+        const stakeStepCount = state.currentWorkflow?.steps.length ?? 0;
+        await updateUI(id, renderStakeForm(stakeStepCount));
+        return;
+      }
+
+      case 'submit-deposit': {
+        await handleDepositSubmit(id, state, depositForm);
+        return;
+      }
+
+      case 'submit-stake': {
+        await handleStakeSubmit(id, state, stakeForm);
+        return;
+      }
+
+      case 'step-bridge': {
         await updateUI(id, (
           <Box>
             <Box direction="horizontal" alignment="space-between">
-              <Heading>{`${actionName.charAt(0).toUpperCase()}${actionName.slice(1)}`}</Heading>
+              <Heading>Bridge</Heading>
               <Icon name="clock" color="muted" />
             </Box>
             <Banner title="Coming Soon" severity="info">
-              <Text>This action type will be available soon.</Text>
+              <Text>Use Swap with different from/to chains for cross-chain bridging.</Text>
             </Banner>
             <Section>
               <Button name="add-step" variant="primary">

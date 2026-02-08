@@ -2,6 +2,7 @@ import type { OnRpcRequestHandler } from '@metamask/snaps-sdk';
 
 import { CHAINS } from './data/chains';
 import { TOKENS } from './data/tokens';
+import { getVaultTokensForChain } from './data/vaults';
 import {
   ENS_PUBLIC_RESOLVER,
   ENS_WORKFLOW_KEY_LEGACY,
@@ -138,6 +139,21 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
         throw new Error(`Token ${fromSymbol} not found on chain ${fromChain}.`);
       }
 
+      // Resolve toToken address: vault registry for deposit/stake, TOKENS for swap/bridge
+      let toTokenAddress: string;
+      if (step.type === 'deposit' || step.type === 'stake') {
+        const vaultTokens = getVaultTokensForChain(toChain);
+        const vaultToken = vaultTokens.find(
+          (vault) => vault.symbol === toSymbol,
+        );
+        if (!vaultToken) {
+          throw new Error(`Vault token ${toSymbol} not found on chain ${toChain}.`);
+        }
+        toTokenAddress = vaultToken.address;
+      } else {
+        toTokenAddress = toTokenInfo?.address ?? toSymbol;
+      }
+
       // Resolve amount: use chained output or fixed amount
       let rawAmount: string;
       if (cfg.useAllFromPrevious && params.stepIndex > 0) {
@@ -156,7 +172,7 @@ export const onRpcRequest: OnRpcRequestHandler = async ({ request }) => {
         fromChain,
         toChain,
         fromTokenInfo.address,
-        toTokenInfo?.address ?? toSymbol,
+        toTokenAddress,
         rawAmount,
         userAddr,
         s.preferences.slippage / 100,
